@@ -79,3 +79,5 @@ It then calls the backend AI and ZK endpoints, validates that the mocked AI inte
 - support merchant-configurable HSP settlement policies and dynamic fee splits
 - expand the AI engine from simple heuristics to policy-based treasury optimization
 - scale the RWA settlement layer toward institutional vault routing and post-trade reporting
+# sentinelpay-ai
+# sentinelpay-ai
