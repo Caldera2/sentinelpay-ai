@@ -1,0 +1,31 @@
+{
+  "name": "sentinelpay-ai",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*",
+    "contracts"
+  ],
+  "scripts": {
+    "dev:web": "npm run dev --workspace @sentinelpay/web",
+    "dev:api": "npm run dev --workspace @sentinelpay/api",
+    "dev:contracts": "npm run dev --workspace @sentinelpay/contracts",
+    "build": "npm run build --workspace @sentinelpay/shared && npm run build --workspace @sentinelpay/api && npm run build --workspace @sentinelpay/web && npm run build --workspace @sentinelpay/contracts",
+    "start:api": "npm run start --workspace @sentinelpay/api"
+  },
+  "devDependencies": {
+    "get-tsconfig": "^4.10.0",
+    "typescript": "^5.6.3"
+  },
+  "dependencies": {
+    "@stablelib/random": "^2.0.1",
+    "apg-js": "^4.4.0",
+    "ecdsa-sig-formatter": "^1.0.11",
+    "ee-first": "^1.1.1",
+    "esbuild": "^0.28.0",
+    "iconv-lite": "^0.7.2",
+    "side-channel": "^1.1.0",
+    "valid-url": "^1.0.9"
+  }
+}
