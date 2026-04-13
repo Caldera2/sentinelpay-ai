@@ -1,4 +1,4 @@
-import { keccak256, toUtf8Bytes } from "ethers";
+import { getAddress, solidityPackedKeccak256 } from "ethers";
 import { getUserByWallet, upsertUser } from "../lib/db";
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -10,10 +10,11 @@ export async function getNexaIdStatus(walletAddress: string) {
 export async function verifyCredential(walletAddress: string) {
   await sleep(2_000);
 
-  const proofHash = keccak256(toUtf8Bytes(`NEXAID_VERIFIED${walletAddress}`));
-  const holdsRwa = Number.parseInt(walletAddress.slice(-2), 16) % 2 === 0;
+  const normalizedAddress = getAddress(walletAddress);
+  const proofHash = solidityPackedKeccak256(["string", "address"], ["NEXAID_VERIFIED", normalizedAddress]);
+  const holdsRwa = Number.parseInt(normalizedAddress.slice(-2), 16) % 2 === 0;
 
-  const user = await upsertUser(walletAddress, {
+  const user = await upsertUser(normalizedAddress, {
     hasNexaId: true,
     holdsRwa,
     lastProofHash: proofHash,
@@ -26,4 +27,3 @@ export async function verifyCredential(walletAddress: string) {
     user
   };
 }
-

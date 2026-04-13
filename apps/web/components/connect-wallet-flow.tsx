@@ -3,9 +3,10 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import type { EIP1193Provider } from "viem";
 import { useAccount, useConnect, useSignMessage } from "wagmi";
-import { apiBaseUrl, setSessionToken } from "../lib/api";
-import { hashKeyTestnet } from "../lib/wagmi";
+import { backendSetupMessage, fetchApiJson, isApiConfigured, setSessionToken } from "../lib/api";
+import { ensureHashKeyChain, hashKey } from "../lib/wagmi";
 import { IdentityVerificationModal } from "./identity-verification-modal";
 import { Button, Card } from "./ui";
 
@@ -31,6 +32,10 @@ function toWalletToastMessage(error: unknown) {
   const message = getWalletErrorMessage(error);
   const normalized = message.toLowerCase();
 
+  if (normalized.includes("connector already connected") || normalized.includes("already connected")) {
+    return "Wallet already connected.";
+  }
+
   if (normalized.includes("failed to connect to metamask")) {
     return "MetaMask couldn't connect. Unlock the extension, approve access, and try again.";
   }
@@ -40,6 +45,10 @@ function toWalletToastMessage(error: unknown) {
   }
 
   return message;
+}
+
+function isAlreadyConnectedError(error: unknown) {
+  return getWalletErrorMessage(error).toLowerCase().includes("already connected");
 }
 
 export function ConnectWalletFlow() {
@@ -55,8 +64,14 @@ export function ConnectWalletFlow() {
   useEffect(() => {
     const handleWindowError = (event: ErrorEvent) => {
       const message = getWalletErrorMessage(event.error ?? event.message);
+      const normalized = message.toLowerCase();
 
-      if (!message.toLowerCase().includes("failed to connect to metamask")) {
+      if (normalized.includes("connector already connected") || normalized.includes("already connected")) {
+        event.preventDefault();
+        return;
+      }
+
+      if (!normalized.includes("failed to connect to metamask")) {
         return;
       }
 
@@ -66,8 +81,14 @@ export function ConnectWalletFlow() {
 
     const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
       const message = getWalletErrorMessage(event.reason);
+      const normalized = message.toLowerCase();
 
-      if (!message.toLowerCase().includes("failed to connect to metamask")) {
+      if (normalized.includes("connector already connected") || normalized.includes("already connected")) {
+        event.preventDefault();
+        return;
+      }
+
+      if (!normalized.includes("failed to connect to metamask")) {
         return;
       }
 
@@ -85,6 +106,21 @@ export function ConnectWalletFlow() {
   }, []);
 
   async function handleConnect() {
+    if (!isApiConfigured) {
+      toast.error(backendSetupMessage);
+      return;
+    }
+
+    if (isConnected) {
+      if (address) {
+        void checkNexaIDStatus(address).catch((error) => {
+          toast.error(toWalletToastMessage(error));
+        });
+      }
+
+      return;
+    }
+
     try {
       const connector = connectors.find((item) => item.name === "MetaMask") ?? connectors[0];
 
@@ -92,17 +128,30 @@ export function ConnectWalletFlow() {
         throw new Error("No wallet connector is available.");
       }
 
+      if (typeof connector.isAuthorized === "function" && (await connector.isAuthorized())) {
+        return;
+      }
+
+      const ethereum = (window as Window & { ethereum?: EIP1193Provider }).ethereum;
+      if (ethereum) {
+        await ensureHashKeyChain(ethereum);
+      }
+
       await connectAsync({
         connector,
-        chainId: hashKeyTestnet.id
+        chainId: hashKey.id
       });
     } catch (error) {
+      if (isAlreadyConnectedError(error)) {
+        return;
+      }
+
       toast.error(toWalletToastMessage(error));
     }
   }
 
   useEffect(() => {
-    if (!isConnected || !address || hasStarted.current) {
+    if (!isApiConfigured || !isConnected || !address || hasStarted.current) {
       return;
     }
 
@@ -112,15 +161,14 @@ export function ConnectWalletFlow() {
       setStatus("authenticating");
 
       try {
-        const challengeResponse = await fetch(`${apiBaseUrl}/auth/challenge`, {
+        const challenge = await fetchApiJson<{ message: string }>("/auth/challenge", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ walletAddress: address })
         });
-        const challenge = (await challengeResponse.json()) as { message: string };
         const signature = await signMessageAsync({ message: challenge.message });
 
-        const verifyResponse = await fetch(`${apiBaseUrl}/auth/verify`, {
+        const verifyPayload = await fetchApiJson<{ token?: string; error?: string }>("/auth/verify", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -128,9 +176,8 @@ export function ConnectWalletFlow() {
             signature
           })
         });
-        const verifyPayload = (await verifyResponse.json()) as { token?: string; error?: string };
 
-        if (!verifyResponse.ok || !verifyPayload.token) {
+        if (!verifyPayload.token) {
           throw new Error(verifyPayload.error ?? "Unable to establish SentinelPay session.");
         }
 
@@ -148,8 +195,7 @@ export function ConnectWalletFlow() {
   }, [address, isConnected, signMessageAsync]);
 
   async function checkNexaIDStatus(walletAddress: string) {
-    const response = await fetch(`${apiBaseUrl}/zk/status/${walletAddress}`);
-    const payload = (await response.json()) as { verified: boolean };
+    const payload = await fetchApiJson<{ verified: boolean }>(`/zk/status/${walletAddress}`);
 
     if (payload.verified) {
       setStatus("verified");
@@ -170,14 +216,13 @@ export function ConnectWalletFlow() {
     setVerifying(true);
 
     try {
-      const response = await fetch(`${apiBaseUrl}/zk/verify`, {
+      const payload = await fetchApiJson<{ verified: boolean }>("/zk/verify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ walletAddress: address })
       });
-      const payload = (await response.json()) as { verified: boolean };
 
-      if (!response.ok || !payload.verified) {
+      if (!payload.verified) {
         throw new Error("Mock ZK verification failed.");
       }
 
@@ -204,13 +249,19 @@ export function ConnectWalletFlow() {
         </div>
 
         <div className="flex flex-col gap-4 md:flex-row md:items-center">
-          <Button onClick={handleConnect} className="min-w-52" disabled={isPending}>
-            {isPending ? "Connecting..." : "Connect Wallet"}
+          <Button onClick={handleConnect} className="min-w-52" disabled={isPending || !isApiConfigured}>
+            {!isApiConfigured ? "Backend Setup Required" : isPending ? "Connecting..." : "Connect Wallet"}
           </Button>
-          <Button variant="secondary" onClick={() => address && checkNexaIDStatus(address)} disabled={!address}>
+          <Button variant="secondary" onClick={() => address && checkNexaIDStatus(address)} disabled={!address || !isApiConfigured}>
             Re-check NexaID
           </Button>
         </div>
+
+        {!isApiConfigured ? (
+          <div className="rounded-3xl border border-amber-400/20 bg-amber-400/10 p-4 text-sm leading-6 text-amber-100">
+            {backendSetupMessage}
+          </div>
+        ) : null}
 
         <div className="rounded-3xl border border-white/10 bg-white/5 p-4 text-sm text-slate-300">
           Status:{" "}

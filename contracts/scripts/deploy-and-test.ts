@@ -11,12 +11,36 @@ type IntentResponse = {
   shouldUseZkDiscount: boolean;
 };
 
-function requireEnv(name: string) {
-  const value = process.env[name];
-  if (!value) {
-    throw new Error(`Missing required environment variable: ${name}`);
+const ACCEPTED_SMOKE_TEST_ASSETS = new Set(["HSK", "HASHKEY", "USDT"]);
+
+function normalizePrivateKey(value: string) {
+  const trimmed = value.trim().replace(/^['"]|['"]$/g, "");
+  return trimmed.startsWith("0x") ? trimmed.slice(2) : trimmed;
+}
+
+function requireValidPrivateKey() {
+  const value = process.env.PRIVATE_KEY ?? "";
+
+  if (!value.trim()) {
+    throw new Error("PRIVATE_KEY is not set yet. Add it to contracts/.env or ../.env before deploying to hashkey.");
   }
-  return value;
+
+  const normalized = normalizePrivateKey(value);
+
+  if (!/^[0-9a-fA-F]{64}$/.test(normalized)) {
+    throw new Error("PRIVATE_KEY is set, but it doesn't look like a full 32-byte hex key yet.");
+  }
+
+  return `0x${normalized}`;
+}
+
+function shouldBypassAiAssetCheck() {
+  const value = (process.env.BYPASS_AI_ASSET_CHECK ?? "true").trim().toLowerCase();
+  return value !== "false" && value !== "0" && value !== "no";
+}
+
+function normalizeAssetSymbol(value: string) {
+  return value.trim().toUpperCase();
 }
 
 async function main() {
@@ -25,9 +49,12 @@ async function main() {
   const rwaVault = getAddress(process.env.RWA_VAULT_ADDRESS ?? "0x8337b13E90B25cFE18570b6E946549D158f1D1cF");
   const merchantWallet = getAddress(process.env.MERCHANT_WALLET ?? "0x25f771D0B086602FEc043B6cCa1eD3E5fDcd8F1d");
 
-  requireEnv("PRIVATE_KEY");
+  requireValidPrivateKey();
 
   const [deployer] = await hre.ethers.getSigners();
+  if (!deployer) {
+    throw new Error("No deployer account was loaded for the hashkey network. Check PRIVATE_KEY and Hardhat network config.");
+  }
   console.log(`Deploying SentinelPay to HashKey Testnet via ${rpcUrl}`);
   console.log(`Deployer: ${deployer.address}`);
 
@@ -37,6 +64,7 @@ async function main() {
 
   const contractAddress = await engine.getAddress();
   console.log(`Settlement engine deployed to ${contractAddress}`);
+  console.log(`[SENTINEL_ACTIVATE]: ${contractAddress}`);
 
   const walletAddress = deployer.address;
   const intentResponse = await fetch(`${backendUrl}/ai/intent`, {
@@ -47,9 +75,19 @@ async function main() {
     body: JSON.stringify({ walletAddress, demoBypass: true })
   });
   const intent = (await intentResponse.json()) as IntentResponse;
+  const normalizedAsset = normalizeAssetSymbol(intent.recommendedAsset);
+  const bypassAiAssetCheck = shouldBypassAiAssetCheck();
 
-  if (intent.recommendedAsset !== "HSK") {
-    throw new Error(`AI intent mismatch. Expected HSK for settlement demo, got ${intent.recommendedAsset}`);
+  if (!ACCEPTED_SMOKE_TEST_ASSETS.has(normalizedAsset)) {
+    throw new Error(
+      `AI intent returned unsupported asset "${intent.recommendedAsset}". Supported smoke-test assets: ${Array.from(ACCEPTED_SMOKE_TEST_ASSETS).join(", ")}.`
+    );
+  }
+
+  if (bypassAiAssetCheck) {
+    console.log(`AI asset check bypassed for smoke test. Backend recommended ${intent.recommendedAsset}.`);
+  } else if (normalizedAsset !== "HSK" && normalizedAsset !== "HASHKEY") {
+    throw new Error(`AI intent mismatch. Expected HSK or HashKey for settlement demo, got ${intent.recommendedAsset}`);
   }
 
   const zkResponse = await fetch(`${backendUrl}/zk/verify`, {

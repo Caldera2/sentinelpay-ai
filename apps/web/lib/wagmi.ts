@@ -4,6 +4,14 @@ import { injected } from "@wagmi/core";
 import { createConfig, http } from "wagmi";
 import type { Chain, EIP1193Provider } from "viem";
 
+type ProviderRequestError = Error & {
+  code?: number;
+};
+
+type ChainSwitchProvider = {
+  request: (...args: any[]) => Promise<unknown>;
+};
+
 type InjectedWindow = Window & {
   ethereum?: EIP1193Provider & {
     isMetaMask?: true;
@@ -11,7 +19,7 @@ type InjectedWindow = Window & {
   };
 };
 
-export const hashKeyTestnet: Chain = {
+export const hashKey: Chain = {
   id: 133,
   name: "HashKey Chain Testnet",
   nativeCurrency: {
@@ -36,8 +44,42 @@ export const hashKeyTestnet: Chain = {
   testnet: true
 };
 
+function toHexChainId(chainId: number) {
+  return `0x${chainId.toString(16)}`;
+}
+
+export async function ensureHashKeyChain(provider: ChainSwitchProvider) {
+  try {
+    await provider.request({
+      method: "wallet_switchEthereumChain",
+      params: [{ chainId: toHexChainId(hashKey.id) }]
+    });
+  } catch (error) {
+    const requestError = error as ProviderRequestError;
+    const message = requestError.message?.toLowerCase() ?? "";
+    const shouldAddChain = requestError.code === 4902 || message.includes("unrecognized chain id");
+
+    if (!shouldAddChain) {
+      throw error;
+    }
+
+    await provider.request({
+      method: "wallet_addEthereumChain",
+      params: [
+        {
+          chainId: toHexChainId(hashKey.id),
+          chainName: hashKey.name,
+          nativeCurrency: hashKey.nativeCurrency,
+          rpcUrls: hashKey.rpcUrls.default.http,
+          blockExplorerUrls: [hashKey.blockExplorers?.default.url].filter(Boolean)
+        }
+      ]
+    });
+  }
+}
+
 export const wagmiConfig = createConfig({
-  chains: [hashKeyTestnet],
+  chains: [hashKey],
   multiInjectedProviderDiscovery: false,
   connectors: [
     injected({
@@ -63,6 +105,6 @@ export const wagmiConfig = createConfig({
     })
   ],
   transports: {
-    [hashKeyTestnet.id]: http(hashKeyTestnet.rpcUrls.default.http[0])
+    [hashKey.id]: http(hashKey.rpcUrls.default.http[0])
   }
 });
