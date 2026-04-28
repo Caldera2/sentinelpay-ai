@@ -1,83 +1,69 @@
-# SentinelPay AI
+SentinelPay AI 
+SentinelPay AI is a high-performance PayFi (Payment Finance) gateway built for the Solana ecosystem. The project merges Solana Actions/Blinks for one-click settlement, an RWA-integrated payment vault, and a lightweight AI intent engine to transform idle merchant revenue into active yield-bearing assets.
 
-SentinelPay AI is a hackathon-ready PayFi gateway built for the HashKey Chain ecosystem. The project combines a native HSK settlement flow, an HSP-inspired payment vault, a lightweight AI intent engine, and a NexaID-flavored zero-knowledge identity experience so the demo feels both credible and memorable in three minutes.
+Why It Matters
+SentinelPay solves the Capital Inefficiency Gap in on-chain commerce. Instead of merchant revenue sitting idle in static stablecoins, our protocol automatically routes a configurable slice of every transaction into institutional-grade RWA vaults (e.g., Ondo USDY) the moment the transaction settles.
 
-## Why It Matters
+Stack
+L1 Blockchain: Solana (Mainnet-ready)
 
-SentinelPay focuses on the PayFi track first: a user can connect a wallet, prove eligibility through a mocked NexaID ZK flow, receive an AI-guided payment recommendation, and settle the transaction on HashKey Chain L2 while routing a configurable slice of the payment into an RWA vault.
+UX/Checkout: Solana Actions & Blinks
 
-## Stack
+Liquidity Routing: Jupiter V6 API
 
-- HashKey Chain L2
-- HSP-inspired settlement logic
-- NexaID verification mock with ZK-style proof hashing
-- Next.js
-- Tailwind CSS
-- Shadcn-style UI patterns
-- Wagmi + ConnectKit
-- Express + SIWE + JWT
-- Solidity + OpenZeppelin
+Yield Generation: Ondo Finance (USDY)
 
-## Project Structure
+Infrastructure: Helius RPC
 
-- `contracts`: Solidity contracts and the `deploy-and-test.ts` deployment script
-- `apps/api`: Express backend with AI intent, ZK verification, SIWE auth, and contract event listeners
-- `apps/web`: Next.js frontend for the landing page, login flow, dashboard, checkout, and transaction history
-- `packages/shared`: Shared AI strategy logic and contract ABI
+Frontend: Next.js + Tailwind CSS
 
-## Core Flows
+Backend: Supabase (PostgreSQL) + FastAPI
 
-### PaymentVault and Settlement Engine
+Wallet Integration: Phantom / Backpack
 
-The Solidity layer includes:
+Project Structure
+programs: Anchor/Rust smart contracts for the Settlement Engine.
 
-- `PaymentVault` for `requestPayment` and `settleWithRWA`
-- `SentinelPaySettlementEngine` for direct `processPayment`
-- mock NexaID proof validation using deterministic `bytes32` hashes
-- RWA-backed routing so part of each HSK payment is sent into a vault
-- `PaymentSettled(address indexed merchant, uint256 amount, string track)` for hackathon storytelling across PayFi and DeFi
+apps/web: Next.js frontend featuring the Merchant Dashboard, Blink generator, and RWA yield tracker.
 
-### AI Intent Engine
+apps/api: Backend handling AI intent logic and real-time transaction indexing via Supabase.
 
-The TypeScript strategy engine accepts a wallet snapshot with token balances and yield data, then uses hard-coded heuristic logic to:
+packages/sdk: Shared TypeScript logic for Blink construction and Jupiter swap routing.
 
-- choose the lowest-growth asset to spend
-- recommend HSK for RWA holders so they can keep RWAs productive and earn loyalty points
-- apply a 5% discount when NexaID is present
+Core Flows
+1. Atomic Settlement & RWA Routing
+The protocol utilizes a specialized settlement logic:
 
-The backend exposes this through `/ai/intent` as a JSON mock API for the frontend.
+Split-to-Yield: Every payment can be split between the merchant's liquid wallet and a yield-bearing RWA vault.
 
-### Identity and Access
+Atomic Swaps: Uses Jupiter V6 to perform atomic User Token -> USDC -> USDY swaps in a single transaction.
 
-SentinelPay uses:
+Native Blinks: Transactions are packaged as Solana Blinks, allowing checkout to happen directly on social media platforms.
 
-- SIWE challenge generation and signature verification
-- JWT session issuance after wallet ownership is proven
-- mocked NexaID verification via `/zk/verify`
-- a frontend verification modal with a deliberate 2-second proof-generation delay
+2. AI Intent Engine
+The strategy engine analyzes merchant liquidity and market yield data to:
 
-## Local Development
+Recommend Yield Splits: Optimizes the percentage of revenue routed to RWAs based on the merchant's upcoming cash-flow needs.
 
-1. Copy `.env.example` to `.env` and set `PRIVATE_KEY`, `JWT_SECRET`, wallet addresses, and the deployed contract address.
-2. Install dependencies with your preferred workspace-aware package manager.
-3. Run the backend from `apps/api`.
-4. Run the frontend from `apps/web`.
-5. Deploy the contract with `contracts/scripts/deploy-and-test.ts`.
+Fee Optimization: Automatically chooses the most efficient liquidity path via Jupiter to minimize slippage during settlement.
 
-## Deployment Script
+3. High-Performance Infrastructure
+Helius RPC: Utilizes dedicated rpc_ keys for high-velocity transaction simulation and landing rates.
 
-`deploy-and-test.ts` deploys the settlement engine to HashKey Chain Testnet using:
+Resilient Connections: Implements singleton connection patterns with automated failover to ensure 100% uptime during high network congestion.
 
-- RPC: `https://133.rpc.thirdweb.com`
-- Chain ID: `133`
+Local Development
+Set NEXT_PUBLIC_SOLANA_RPC_URL in .env with your Helius RPC Key.
 
-It then calls the backend AI and ZK endpoints, validates that the mocked AI intent aligns with the settlement rail, and sends a test payment on-chain.
+Define NEXT_PUBLIC_SOLANA_TREASURY_ADDRESS to route platform fees.
 
-## Future Roadmap
+Install dependencies using your workspace-aware package manager.
 
-- move from mocked proof validation to a real NexaID verifier contract or attestation bridge
-- support merchant-configurable HSP settlement policies and dynamic fee splits
-- expand the AI engine from simple heuristics to policy-based treasury optimization
-- scale the RWA settlement layer toward institutional vault routing and post-trade reporting
-# sentinelpay-ai
-# sentinelpay-ai
+Run npm run dev to launch the Merchant Dashboard.
+
+Future Roadmap
+Dynamic Fee Splits: Support for complex, multi-party settlement policies.
+
+Institutional Reporting: Real-time post-trade reporting for RWA tax compliance.
+
+Advanced AI Treasury: Moving from simple heuristics to full policy-based treasury optimization for SMEs.
