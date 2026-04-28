@@ -1,6 +1,3 @@
-const nextConfig = {
-  transpilePackages: ["@sentinelpay/shared"]
-};
+const nextConfig = {};
 
 export default nextConfig;
-

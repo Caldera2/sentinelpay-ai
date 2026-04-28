@@ -1,12 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { fetchApiJson, getSessionToken, isApiConfigured } from "../lib/api";
+import { ExternalLink } from "lucide-react";
 import { Button, Card } from "./ui";
 
 type TransactionItem = {
   merchant: string;
   amount: string;
+  asset: string;
   track: string;
   txHash: string;
   status: "pending" | "success" | "failed";
@@ -14,6 +15,7 @@ type TransactionItem = {
 };
 
 const transactionRecordedEvent = "sentinelpay:transaction-recorded";
+const transactionStorageKey = "sentinelpay.solana.transactions";
 
 function shortenAddress(value: string) {
   return `${value.slice(0, 6)}...${value.slice(-4)}`;
@@ -28,23 +30,16 @@ export function TransactionHistoryTable() {
   const [selectedItem, setSelectedItem] = useState<TransactionItem | null>(null);
 
   useEffect(() => {
-    async function loadHistory() {
-      const token = getSessionToken();
-
-      if (!token || !isApiConfigured) {
+    function loadHistory() {
+      if (typeof window === "undefined") {
         return;
       }
 
-      const payload = await fetchApiJson<{ items: TransactionItem[] }>("/payments/history", {
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
-      });
-
-      setItems(payload.items);
+      const payload = window.localStorage.getItem(transactionStorageKey);
+      setItems(payload ? (JSON.parse(payload) as TransactionItem[]) : []);
     }
 
-    void loadHistory().catch(() => undefined);
+    loadHistory();
 
     const handleRecorded = (event: Event) => {
       const nextItem = (event as CustomEvent<TransactionItem>).detail;
@@ -65,7 +60,7 @@ export function TransactionHistoryTable() {
 
   return (
     <Card className="overflow-hidden">
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mb-6 flex items-center justify-between gap-4">
         <div>
           <div className="text-xs uppercase tracking-[0.24em] text-cyan-200">Merchant Portal</div>
           <h3 className="mt-2 font-display text-2xl text-white">Transaction history</h3>
@@ -78,14 +73,14 @@ export function TransactionHistoryTable() {
         </div>
       ) : (
         <div className="overflow-x-auto">
-          <table className="min-w-full text-left text-sm text-slate-200">
+          <table className="min-w-[720px] w-full text-left text-sm text-slate-200">
             <thead className="text-xs uppercase tracking-[0.18em] text-slate-400">
               <tr>
                 <th className="pb-4">Merchant</th>
-                <th className="pb-4">Amount (HSK)</th>
+                <th className="pb-4">Amount</th>
                 <th className="pb-4">Track</th>
                 <th className="pb-4">Status</th>
-                <th className="pb-4">Tx Hash</th>
+                <th className="pb-4">Signature</th>
               </tr>
             </thead>
             <tbody>
@@ -107,6 +102,8 @@ export function TransactionHistoryTable() {
                       className="w-full rounded-2xl px-3 py-2 text-left transition hover:bg-white/5"
                     >
                       {item.amount}
+                      {" "}
+                      {item.asset}
                     </button>
                   </td>
                   <td className="py-2 pr-4">
@@ -150,8 +147,8 @@ export function TransactionHistoryTable() {
       )}
 
       {selectedItem ? (
-        <div className="mt-6 rounded-[24px] border border-cyan-400/15 bg-slate-950/60 p-5">
-          <div className="flex items-start justify-between gap-4">
+        <div className="mt-6 rounded-[24px] border border-cyan-400/15 bg-slate-950/60 p-4 sm:p-5">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <div className="text-xs uppercase tracking-[0.24em] text-cyan-200">Transaction Detail</div>
               <h4 className="mt-2 font-display text-xl text-white">{selectedItem.track} settlement</h4>
@@ -168,7 +165,9 @@ export function TransactionHistoryTable() {
             </div>
             <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
               <div className="text-xs uppercase tracking-[0.18em] text-slate-400">Amount</div>
-              <div className="mt-2 text-white">{selectedItem.amount} HSK</div>
+              <div className="mt-2 text-white">
+                {selectedItem.amount} {selectedItem.asset}
+              </div>
             </div>
             <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
               <div className="text-xs uppercase tracking-[0.18em] text-slate-400">Status</div>
@@ -183,6 +182,15 @@ export function TransactionHistoryTable() {
           <div className="mt-3 rounded-2xl border border-white/10 bg-white/5 p-4">
             <div className="text-xs uppercase tracking-[0.18em] text-slate-400">Transaction Hash</div>
             <div className="mt-2 break-all font-mono text-xs text-cyan-100">{selectedItem.txHash}</div>
+            <a
+              href={`https://solscan.io/tx/${selectedItem.txHash}`}
+              target="_blank"
+              rel="noreferrer"
+              className="mt-3 inline-flex items-center gap-2 text-sm text-cyan-200 hover:text-white"
+            >
+              View on Solscan
+              <ExternalLink className="h-4 w-4" />
+            </a>
           </div>
         </div>
       ) : null}

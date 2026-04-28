@@ -1,0 +1,16 @@
+[phases.setup]
+nixPkgs = ["nodejs_20"]
+
+[phases.install]
+cmds = [
+  "npm ci --workspace @sentinelpay/shared --workspace @sentinelpay/api --include-workspace-root=false"
+]
+
+[phases.build]
+cmds = [
+  "npm run build --workspace @sentinelpay/shared",
+  "npm run build --workspace @sentinelpay/api"
+]
+
+[start]
+cmd = "npm run start --workspace @sentinelpay/api"

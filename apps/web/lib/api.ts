@@ -1,12 +1,6 @@
-import { getChecksummedAddress } from "./contract-address";
-
 const defaultApiBaseUrl = process.env.NODE_ENV === "development" ? "http://localhost:4000" : "";
 
 export const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL?.trim() || defaultApiBaseUrl;
-export const contractAddress =
-  getChecksummedAddress(process.env.NEXT_PUBLIC_CONTRACT_ADDRESS) ?? "0x0000000000000000000000000000000000000000";
-export const merchantWallet =
-  getChecksummedAddress(process.env.NEXT_PUBLIC_MERCHANT_WALLET) ?? "0x25f771D0B086602FEc043B6cCa1eD3E5fDcd8F1d";
 export const isApiConfigured = Boolean(apiBaseUrl);
 export const backendSetupMessage =
   "SentinelPay AI backend is not configured. Deploy the Railway API and set NEXT_PUBLIC_API_URL to enable login and ZK checks.";
@@ -29,7 +23,16 @@ function looksLikeHtmlResponse(text: string) {
 }
 
 export async function fetchApiJson<T>(path: string, init?: RequestInit) {
-  const response = await fetch(getApiUrl(path), init);
+  let response: Response;
+
+  try {
+    response = await fetch(getApiUrl(path), init);
+  } catch {
+    throw new Error(
+      "SentinelPay API is temporarily unreachable. Please wait a moment and try again."
+    );
+  }
+
   const contentType = response.headers.get("content-type")?.toLowerCase() ?? "";
   const text = await response.text();
   let payload: T | ErrorPayload | null = null;

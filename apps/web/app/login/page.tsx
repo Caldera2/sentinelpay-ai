@@ -10,7 +10,7 @@ export default function LoginPage() {
             SentinelPay AI
           </Link>
           <Link href="/dashboard" className="text-sm text-cyan-200">
-            Skip to dashboard
+            Open treasury dashboard
           </Link>
         </div>
         <ConnectWalletFlow />

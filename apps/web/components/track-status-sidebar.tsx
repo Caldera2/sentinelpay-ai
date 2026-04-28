@@ -1,17 +1,17 @@
 import { Badge, Card } from "./ui";
 
 const statuses = [
-  { label: "PayFi Track", value: "Active - HSP Integrated" },
-  { label: "AI Track", value: "Active - Intent Engine Running" },
-  { label: "ZKID Track", value: "Verified - NexaID Linked" }
+  { label: "Settlement Rail", value: "Active - Solana USDC" },
+  { label: "Swap Engine", value: "Ready - Jupiter Exact-Out" },
+  { label: "Treasury Lane", value: "Live - Liquid + USDY Split" }
 ];
 
 export function TrackStatusSidebar() {
   return (
-    <Card className="space-y-5">
+    <Card className="space-y-5 lg:sticky lg:top-6 lg:self-start">
       <div>
         <div className="text-xs uppercase tracking-[0.24em] text-cyan-200">Track Status</div>
-        <h3 className="mt-2 font-display text-2xl text-white">Hackathon proof board</h3>
+        <h3 className="mt-2 font-display text-2xl text-white">Treasury operations</h3>
       </div>
 
       <div className="space-y-4">
