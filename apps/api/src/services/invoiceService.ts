@@ -374,23 +374,25 @@ export function createInvoiceService(
             [id, wallet],
           )
         ).rows[0];
-        if (!own || own.status !== "open")
-          throw new HttpError(409, "Open invoice not found for this merchant.");
-        if (
-          (
-            await tx.query(
-              "SELECT id FROM payment_attempts WHERE invoice_id=$1 LIMIT 1",
-              [id],
-            )
-          ).rows.length
-        )
+        if (!own)
+          throw new HttpError(404, "Invoice not found for this merchant.");
+        if (own.status === "paid")
           throw new HttpError(
             409,
-            "A payment attempt exists. Reconcile it before cancelling this invoice.",
+            "Paid invoices cannot be cancelled. Issue a refund instead.",
           );
+        if (own.status === "cancelled") return;
+        // Keep attempts for reconciliation: cancellation stops new checkout
+        // payments, but cannot revoke a transaction already signed or sent.
+        // Confirmation takes the same invoice lock and records later receipts
+        // as refundable excess rather than marking a cancelled invoice paid.
         await tx.query("UPDATE invoices SET status='cancelled' WHERE id=$1", [
           id,
         ]);
+        await tx.query(
+          "INSERT INTO audit_events(wallet,action,entity_id) VALUES($1,'invoice.cancelled',$2)",
+          [wallet, id],
+        );
       });
       return get(id);
     },

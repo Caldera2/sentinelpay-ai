@@ -383,6 +383,9 @@ export function MerchantPortal() {
     address && session.data?.walletAddress === address,
   );
   const [creating, setCreating] = useState(false);
+  const [cancellingInvoice, setCancellingInvoice] = useState<string | null>(
+    null,
+  );
   const [title, setTitle] = useState("");
   const [amount, setAmount] = useState("");
   const [offset, setOffset] = useState(0);
@@ -491,16 +494,25 @@ export function MerchantPortal() {
     }
   }
   async function cancelInvoice(id: string) {
+    if (cancellingInvoice) return;
+    setCancellingInvoice(id);
     try {
       await fetchApiJson(`/invoices/${id}/cancel`, {
         method: "POST",
         body: "{}",
       });
-      await invoices.refetch();
+      await Promise.all([
+        queries.invalidateQueries({ queryKey: ["invoices", address] }),
+        queries.invalidateQueries({ queryKey: ["invoice", id] }),
+      ]);
+      toast.success("Invoice cancelled. New checkout payments are disabled.");
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : "Unable to cancel invoice.",
       );
+      await invoices.refetch();
+    } finally {
+      setCancellingInvoice(null);
     }
   }
   async function copyLink(id: string) {
@@ -683,6 +695,11 @@ export function MerchantPortal() {
             </div>
             <Card className="space-y-5">
               <h2 className="text-2xl font-semibold">Invoices</h2>
+              <p className="text-sm text-slate-400">
+                Cancel any unpaid invoice, including failed or rejected payment
+                attempts. Payments already sent may still settle and can be
+                refunded.
+              </p>
               {invoices.error ? (
                 <p role="alert">{invoices.error.message}</p>
               ) : invoices.isLoading ? (
@@ -724,9 +741,12 @@ export function MerchantPortal() {
                         {item.status === "open" && (
                           <Button
                             variant="ghost"
+                            disabled={Boolean(cancellingInvoice)}
                             onClick={() => void cancelInvoice(item.id)}
                           >
-                            Cancel
+                            {cancellingInvoice === item.id
+                              ? "Cancelling…"
+                              : "Cancel"}
                           </Button>
                         )}
                       </div>
@@ -800,6 +820,11 @@ export function MerchantPortal() {
                             {payment.kind === "duplicate" && (
                               <span className="mt-1 block text-xs text-amber-200">
                                 Duplicate transfer
+                              </span>
+                            )}
+                            {payment.kind === "cancelled" && (
+                              <span className="mt-1 block text-xs text-amber-200">
+                                Payment on cancelled invoice
                               </span>
                             )}
                           </td>

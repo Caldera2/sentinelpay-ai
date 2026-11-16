@@ -47,7 +47,7 @@ export type PaymentRecord = {
   appliedAtomic: string;
   refundedAtomic: string;
   refundableAtomic: string;
-  kind: "payment" | "duplicate";
+  kind: "payment" | "duplicate" | "cancelled";
 };
 export type PreparedRefund = PreparedPayment & {
   id: string;

@@ -47,7 +47,13 @@ export function RefundOperations({
   useEffect(() => {
     requestId.current = null;
     setAmount(selected ? formatUsdc(selected.refundableAtomic) : "");
-    setReason(selected?.kind === "duplicate" ? "Duplicate payment" : "");
+    setReason(
+      selected?.kind === "duplicate"
+        ? "Duplicate payment"
+        : selected?.kind === "cancelled"
+          ? "Cancelled invoice"
+          : "",
+    );
   }, [selected]);
   async function refresh() {
     await Promise.all(

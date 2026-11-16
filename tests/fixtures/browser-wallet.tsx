@@ -102,6 +102,11 @@ export class TestWalletAdapter extends BaseMessageSignerWalletAdapter {
     transaction: T,
   ): Promise<T> {
     if (!this.address) throw new Error("Connect the automated wallet first.");
+    const rejectionFlag = "sentinelpay.test.rejectNextTransaction";
+    if (sessionStorage.getItem(rejectionFlag) === "1") {
+      sessionStorage.removeItem(rejectionFlag);
+      throw new Error("Automated wallet rejection.");
+    }
     const message =
       transaction instanceof VersionedTransaction
         ? transaction.message.serialize()

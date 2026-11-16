@@ -65,9 +65,11 @@ export function PaymentCheckout({ invoiceId }: { invoiceId: string }) {
     sessionStorage.removeItem(key);
     setPending(null);
     setMessage(
-      result.duplicate
-        ? "This additional transfer was received and recorded. Contact the merchant about a refund; do not pay again."
-        : "Payment verified on-chain. Your receipt is ready.",
+      result.invoice?.status === "cancelled"
+        ? "Transfer received for a cancelled invoice. Contact the merchant for a refund; do not pay again."
+        : result.duplicate
+          ? "This additional transfer was received and recorded. Contact the merchant about a refund; do not pay again."
+          : "Payment verified on-chain. Your receipt is ready.",
     );
     await invoice.refetch();
   }
@@ -243,9 +245,17 @@ export function PaymentCheckout({ invoiceId }: { invoiceId: string }) {
           )}
         </div>
       ) : item.status !== "open" || expired ? (
-        <p role="status">
-          This invoice is {expired ? "expired" : item.status}.
-        </p>
+        <div className="space-y-2">
+          <p role="status">
+            This invoice is {item.status === "open" ? "expired" : item.status}.
+          </p>
+          {item.status === "cancelled" && (
+            <p className="text-sm text-slate-400">
+              Payments already sent may still settle. Check your receipt and
+              contact the merchant for a refund if funds were transferred.
+            </p>
+          )}
+        </div>
       ) : (
         <>
           <WalletMultiButton />

@@ -43,7 +43,7 @@ npm run security:audit
 
 By default, the regression suite uses PGlite. Set `TEST_DATABASE_URL` to run the same suite against a real PostgreSQL server; each test file uses its own temporary schema. The database role needs permission to create and drop those schemas. CI exercises both engines.
 
-For the automated browser flow, set `TEST_DATABASE_URL` to a **local** PostgreSQL database, install Chromium with `npx playwright install chromium`, then run `npm run test:browser`. On Windows, `PLAYWRIGHT_SYSTEM_CHROME=1` selects an installed Chrome instead. The runner starts isolated API/web fixtures and exercises wallet sign-in, invoice checkout, a lost broadcast response, partial/full refunds, reload persistence, and sign-out. Its generated wallet keys and simulated chain exist only in the test environment; no real wallet or funds are used. Jupiter contract tests mock provider responses and verify quote constraints and composed transaction instructions.
+For the automated browser flows, set `TEST_DATABASE_URL` to a **local** PostgreSQL database, install Chromium with `npx playwright install chromium`, then run `npm run test:browser`. On Windows, `PLAYWRIGHT_SYSTEM_CHROME=1` selects an installed Chrome instead. The runner starts isolated API/web fixtures and exercises wallet sign-in, invoice checkout, a lost broadcast response, partial/full refunds, cancellation after a rejected wallet attempt, reload persistence, and sign-out. Its generated wallet keys and simulated chain exist only in the test environment; no real wallet or funds are used. Jupiter contract tests mock provider responses and verify quote constraints and composed transaction instructions.
 
 See [AUDIT.md](AUDIT.md) for actual database, browser, build, contract, and live dependency scan results. Test artifacts are written under the ignored `audit-output/` directory.
 
@@ -71,9 +71,15 @@ Treasury trading is off by default. Enabling TREASURY_ENABLED requires mainnet, 
 
 Useful primary references: [Jupiter migration](https://developers.jup.ag/docs/swap/migration/metis-to-build), [Solana transaction RPC](https://solana.com/docs/rpc/http/gettransaction), [Ondo USDY](https://ondo.finance/usdy).
 
+## Invoice cancellation
+
+The signed-in merchant who owns an invoice can cancel it while it remains unpaid (`open`), including after failed transactions, rejected wallet prompts, expired attempts, or unresolved attempts. An expired unpaid invoice can also be cancelled. Repeating cancellation returns the same cancelled invoice. Paid invoices require the refund workflow instead.
+
+Cancellation closes checkout and prevents new payment preparation. It cannot revoke a transaction already signed or sent. Existing attempts remain available for receipt recovery; any transfer verified after cancellation is labelled **Payment on cancelled invoice**, counts as refundable excess rather than invoice revenue, and can be refunded to its original payer. Cancellation and payment confirmation lock the same invoice row, so a concurrent payment either settles first and prevents cancellation, or is recorded against the cancelled invoice without reopening it.
+
 ## Refunds and duplicate payments
 
-Every verified incoming signature is recorded. The first receipt pays the invoice; additional transfers remain visible as excess funds rather than inflating revenue. A merchant can refund up to the unrefunded amount of each receipt. The destination is fixed to its original payer, and every refund needs the merchant wallet signature and a finalized receipt. Returning overpayment or a duplicate transfer reduces excess liability first; returning invoice funds reduces net invoice revenue.
+Every verified incoming signature is recorded. The first receipt pays an open invoice; additional transfers and payments on cancelled invoices remain visible as excess funds rather than inflating revenue. A merchant can refund up to the unrefunded amount of each receipt. The destination is fixed to its original payer, and every refund needs the merchant wallet signature and a finalized receipt. Returning overpayment or a duplicate transfer reduces excess liability first; returning invoice funds reduces net invoice revenue.
 
 Only one refund can remain pending per merchant. A submitted signature is retained before broadcast, and reconciliation recovers finalized refunds when a browser callback is lost. Uncertain settlement prevents replacement; older unresolved refunds require receipt investigation. This ledger covers supported, verified invoice/refund transactions, not arbitrary transfers made outside the application.
 

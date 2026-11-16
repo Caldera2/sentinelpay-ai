@@ -1,10 +1,11 @@
-import type { Cluster, PaymentRecord } from "@sentinelpay/shared";
+import type { Cluster, Invoice, PaymentRecord } from "@sentinelpay/shared";
 import type { Sql } from "../lib/db";
 export type ReceiptRow = {
   id: string;
   signature: string;
   attempt_id: string;
   invoice_id: string;
+  invoice_status: Invoice["status"];
   merchant_wallet: string;
   title: string;
   payer: string;
@@ -15,7 +16,7 @@ export type ReceiptRow = {
   cluster: Cluster;
   confirmed_at: Date;
 };
-export const receiptSelect = `SELECT r.*,i.title,i.amount_atomic,i.cluster,i.merchant_wallet,p.payer,
+export const receiptSelect = `SELECT r.*,i.title,i.amount_atomic,i.cluster,i.merchant_wallet,i.status AS invoice_status,p.payer,
   COALESCE((SELECT sum(f.amount_atomic) FROM refunds f WHERE f.receipt_id=r.id AND f.status='confirmed'),0)::text AS refunded_atomic
   FROM payment_receipts r JOIN invoices i ON i.id=r.invoice_id JOIN payment_attempts p ON p.id=r.attempt_id`;
 export const receiptView = (r: ReceiptRow): PaymentRecord => ({
@@ -30,7 +31,12 @@ export const receiptView = (r: ReceiptRow): PaymentRecord => ({
   refundableAtomic: (
     BigInt(r.received_atomic) - BigInt(r.refunded_atomic)
   ).toString(),
-  kind: BigInt(r.applied_atomic) > 0n ? "payment" : "duplicate",
+  kind:
+    BigInt(r.applied_atomic) > 0n
+      ? "payment"
+      : r.invoice_status === "cancelled"
+        ? "cancelled"
+        : "duplicate",
   signature: r.signature,
   cluster: r.cluster,
   confirmedAt: new Date(r.confirmed_at).toISOString(),
