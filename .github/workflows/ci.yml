@@ -20,7 +20,7 @@ jobs:
           --health-cmd "pg_isready -U sentinelpay_test -d sentinelpay_test"
           --health-interval 10s --health-timeout 5s --health-retries 5
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v4
         with:
           node-version: 22
