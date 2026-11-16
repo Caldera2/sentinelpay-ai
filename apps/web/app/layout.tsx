@@ -6,8 +6,9 @@ import { Providers } from "../components/providers";
 import { SolanaProvider } from "../components/providers/SolanaProvider";
 
 export const metadata: Metadata = {
-  title: "SentinelPay AI",
-  description: "AI-native Solana PayFi gateway for treasury-aware checkout and yield routing."
+  title: "SentinelPay",
+  description:
+    "Solana USDC invoices, verified payment receipts, and merchant cash reserve planning.",
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {

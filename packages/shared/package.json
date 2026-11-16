@@ -6,9 +6,5 @@
   "types": "dist/index.d.ts",
   "scripts": {
     "build": "tsc -p tsconfig.json"
-  },
-  "dependencies": {
-    "ethers": "^6.13.5"
   }
 }
-

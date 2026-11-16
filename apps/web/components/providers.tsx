@@ -14,7 +14,8 @@ export function Providers({ children }: PropsWithChildren) {
         position="top-right"
         richColors
         toastOptions={{
-          className: "rounded-2xl border border-white/10 bg-slate-950 text-white"
+          className:
+            "rounded-2xl border border-white/10 bg-slate-950 text-white",
         }}
       />
     </QueryClientProvider>

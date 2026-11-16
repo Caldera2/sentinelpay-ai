@@ -8,24 +8,31 @@
     "contracts"
   ],
   "scripts": {
+    "dev": "node scripts/dev.mjs",
     "dev:web": "npm run dev --workspace @sentinelpay/web",
     "dev:api": "npm run dev --workspace @sentinelpay/api",
     "dev:contracts": "npm run dev --workspace @sentinelpay/contracts",
-    "build": "npm run build --workspace @sentinelpay/shared && npm run build --workspace @sentinelpay/api && npm run build --workspace @sentinelpay/web && npm run build --workspace @sentinelpay/contracts",
-    "start:api": "npm run start --workspace @sentinelpay/api"
+    "build": "npm run build --workspace @sentinelpay/shared && npm run build --workspace @sentinelpay/api && npm run build --workspace @sentinelpay/web",
+    "build:contracts": "npm run build --workspace @sentinelpay/contracts",
+    "start:api": "npm run start --workspace @sentinelpay/api",
+    "test": "npm run build --workspace @sentinelpay/shared && tsc -p tsconfig.tests.json && node --test --test-isolation=none audit-output/test-build/tests/*.test.js",
+    "test:contracts": "npm run build:contracts && npm run test --workspace @sentinelpay/contracts",
+    "typecheck": "tsc -p packages/shared/tsconfig.json --noEmit && tsc -p apps/api/tsconfig.json --noEmit && tsc -p apps/web/tsconfig.json --noEmit",
+    "security:scan": "node scripts/security-scan.mjs",
+    "db:migrate": "npm run db:migrate --workspace @sentinelpay/api"
   },
   "devDependencies": {
-    "get-tsconfig": "^4.10.0",
-    "typescript": "^5.6.3"
+    "@playwright/test": "^1.65.1",
+    "@types/node": "^22.10.2",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
   },
-  "dependencies": {
-    "@stablelib/random": "^2.0.1",
-    "apg-js": "^4.4.0",
-    "ecdsa-sig-formatter": "^1.0.11",
-    "ee-first": "^1.1.1",
-    "esbuild": "^0.28.0",
-    "iconv-lite": "^0.7.2",
-    "side-channel": "^1.1.0",
-    "valid-url": "^1.0.9"
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "overrides": {
+    "bigint-buffer": "file:./packages/bigint-codec",
+    "jayson": "5.0.0",
+    "uuid": "^11.1.1"
   }
 }

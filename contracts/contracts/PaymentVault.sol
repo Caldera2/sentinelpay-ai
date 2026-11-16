@@ -17,6 +17,7 @@ contract PaymentVault is AccessControl, Pausable, ReentrancyGuard {
         address payable merchant;
         uint256 amount;
         uint256 rwaAllocation;
+        address payable allocationVault;
         string track;
         bytes32 proofHash;
         bytes32 hspReference;
@@ -41,7 +42,8 @@ contract PaymentVault is AccessControl, Pausable, ReentrancyGuard {
     event PaymentSettled(address indexed merchant, uint256 amount, string track);
     event RwaAllocationTransferred(uint256 indexed requestId, address indexed vault, uint256 amount);
     event HspSettlementRecorded(uint256 indexed requestId, bytes32 indexed hspReference);
-    event MockProofRegistered(address indexed payer, bytes32 indexed proofHash);
+    event ProofApproved(address indexed payer, bytes32 indexed proofHash);
+    event ProofRevoked(address indexed payer, bytes32 indexed proofHash);
 
     constructor(address admin, address payable vault, uint256 rwaBps) {
         require(admin != address(0), "SentinelPay: invalid admin");
@@ -55,12 +57,17 @@ contract PaymentVault is AccessControl, Pausable, ReentrancyGuard {
         rwaBasisPoints = rwaBps;
     }
 
-    function registerMockProof(address payer, bytes32 proofHash) external onlyRole(SETTLEMENT_ROLE) {
+    function registerProof(address payer, bytes32 proofHash) external onlyRole(SETTLEMENT_ROLE) {
         require(payer != address(0), "SentinelPay: invalid payer");
         require(proofHash != bytes32(0), "SentinelPay: empty proof");
 
         approvedProofs[payer][proofHash] = true;
-        emit MockProofRegistered(payer, proofHash);
+        emit ProofApproved(payer, proofHash);
+    }
+
+    function revokeProof(address payer, bytes32 proofHash) external onlyRole(SETTLEMENT_ROLE) {
+        approvedProofs[payer][proofHash] = false;
+        emit ProofRevoked(payer, proofHash);
     }
 
     function requestPayment(
@@ -71,6 +78,7 @@ contract PaymentVault is AccessControl, Pausable, ReentrancyGuard {
     ) public whenNotPaused returns (uint256 requestId) {
         require(merchant != address(0), "SentinelPay: invalid merchant");
         require(amount > 0, "SentinelPay: amount required");
+        require(bytes(track).length > 0, "SentinelPay: track required");
         _requireValidProof(msg.sender, proofHash);
 
         requestId = nextRequestId++;
@@ -81,6 +89,7 @@ contract PaymentVault is AccessControl, Pausable, ReentrancyGuard {
             merchant: merchant,
             amount: amount,
             rwaAllocation: rwaAllocation,
+            allocationVault: rwaVault,
             track: track,
             proofHash: proofHash,
             hspReference: bytes32(0),
@@ -91,7 +100,7 @@ contract PaymentVault is AccessControl, Pausable, ReentrancyGuard {
         emit PaymentRequested(requestId, msg.sender, merchant, amount, track);
     }
 
-    function settleWithRWA(uint256 requestId, bytes32 hspReference) public payable nonReentrant whenNotPaused {
+    function settleWithRWA(uint256 requestId, bytes32 hspReference) public payable nonReentrant whenNotPaused onlyRole(SETTLEMENT_ROLE) {
         _settleRecordedRequest(requestId, hspReference, msg.value);
     }
 
@@ -105,7 +114,7 @@ contract PaymentVault is AccessControl, Pausable, ReentrancyGuard {
         request.settled = true;
         request.hspReference = hspReference;
 
-        _distributeFunds(requestId, request.merchant, paymentAmount, request.rwaAllocation, request.track);
+        _distributeFunds(requestId, request.merchant, request.allocationVault, paymentAmount, request.rwaAllocation, request.track);
 
         emit HspSettlementRecorded(requestId, hspReference);
         emit PaymentSettled(request.merchant, paymentAmount, request.track);
@@ -132,6 +141,7 @@ contract PaymentVault is AccessControl, Pausable, ReentrancyGuard {
     function _distributeFunds(
         uint256 requestId,
         address payable merchant,
+        address payable allocationVault,
         uint256 grossAmount,
         uint256 rwaAllocation,
         string memory track
@@ -143,8 +153,8 @@ contract PaymentVault is AccessControl, Pausable, ReentrancyGuard {
         }
 
         if (rwaAllocation > 0) {
-            rwaVault.sendValue(rwaAllocation);
-            emit RwaAllocationTransferred(requestId, rwaVault, rwaAllocation);
+            allocationVault.sendValue(rwaAllocation);
+            emit RwaAllocationTransferred(requestId, allocationVault, rwaAllocation);
         }
 
         if (bytes(track).length == 0) {
@@ -161,7 +171,6 @@ contract PaymentVault is AccessControl, Pausable, ReentrancyGuard {
             return false;
         }
 
-        bytes32 deterministicProof = keccak256(abi.encodePacked("NEXAID_VERIFIED", payer));
-        return approvedProofs[payer][proofHash] || proofHash == deterministicProof;
+        return approvedProofs[payer][proofHash];
     }
 }

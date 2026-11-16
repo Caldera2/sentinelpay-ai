@@ -1,9 +1,9 @@
 [phases.setup]
-nixPkgs = ["nodejs_20"]
+nixPkgs = ["nodejs_22"]
 
 [phases.install]
 cmds = [
-  "npm ci --workspace @sentinelpay/shared --workspace @sentinelpay/api --include-workspace-root=false"
+  "npm ci --include=dev --workspace @sentinelpay/shared --workspace @sentinelpay/api --workspace @sentinelpay/bigint-codec --include-workspace-root=true"
 ]
 
 [phases.build]

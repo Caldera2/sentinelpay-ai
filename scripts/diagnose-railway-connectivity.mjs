@@ -12,7 +12,7 @@ const proxyCandidates = [
   process.env.HTTPS_PROXY,
   process.env.HTTP_PROXY,
   process.env.ALL_PROXY,
-  process.env.RAILWAY_PROXY_URL
+  process.env.RAILWAY_PROXY_URL,
 ].filter(Boolean);
 
 function logSection(title, data) {
@@ -45,17 +45,17 @@ async function testTls() {
         host,
         port: 443,
         servername: host,
-        timeout: 8_000
+        timeout: 8_000,
       },
       () => {
         logSection("TLS Handshake", {
           authorized: socket.authorized,
           authorizationError: socket.authorizationError ?? null,
-          alpnProtocol: socket.alpnProtocol || null
+          alpnProtocol: socket.alpnProtocol || null,
         });
         socket.end();
         resolve();
-      }
+      },
     );
 
     socket.on("error", reject);
@@ -66,7 +66,7 @@ async function testTls() {
 async function testHttps(payloadBytes) {
   const payload = JSON.stringify({
     query: "{ __typename }",
-    padding: "x".repeat(Math.max(0, payloadBytes - 32))
+    padding: "x".repeat(Math.max(0, payloadBytes - 32)),
   });
 
   await new Promise((resolve, reject) => {
@@ -78,9 +78,9 @@ async function testHttps(payloadBytes) {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Content-Length": Buffer.byteLength(payload)
+          "Content-Length": Buffer.byteLength(payload),
         },
-        timeout: 10_000
+        timeout: 10_000,
       },
       (response) => {
         let body = "";
@@ -92,15 +92,17 @@ async function testHttps(payloadBytes) {
           logSection(`HTTPS POST (${payloadBytes} bytes)`, {
             statusCode: response.statusCode,
             contentType: response.headers["content-type"] ?? null,
-            sample: body.slice(0, 200)
+            sample: body.slice(0, 200),
           });
           resolve();
         });
-      }
+      },
     );
 
     request.on("error", reject);
-    request.on("timeout", () => request.destroy(new Error("HTTPS request timeout")));
+    request.on("timeout", () =>
+      request.destroy(new Error("HTTPS request timeout")),
+    );
     request.write(payload);
     request.end();
   });
@@ -113,13 +115,13 @@ async function testProxy(proxyUrl) {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ query: "{ __typename }" }),
-      dispatcher: undefined
+      dispatcher: undefined,
     });
 
     logSection(`Proxy Result ${proxyUrl}`, {
       status: result.status,
       contentType: result.headers.get("content-type"),
-      sample: (await result.text()).slice(0, 200)
+      sample: (await result.text()).slice(0, 200),
     });
   } catch (error) {
     logSection(`Proxy Error ${proxyUrl}`, String(error));
@@ -128,9 +130,13 @@ async function testProxy(proxyUrl) {
 
 async function testPingMtu(size) {
   try {
-    const { stdout, stderr } = await execFileAsync("ping", ["-f", "-l", String(size), host, "-n", "1"], {
-      windowsHide: true
-    });
+    const { stdout, stderr } = await execFileAsync(
+      "ping",
+      ["-f", "-l", String(size), host, "-n", "1"],
+      {
+        windowsHide: true,
+      },
+    );
     logSection(`Ping MTU ${size}`, stdout || stderr);
   } catch (error) {
     const output = error.stdout || error.stderr || String(error);
@@ -142,7 +148,7 @@ async function main() {
   logSection("Environment", {
     node: process.version,
     proxies: proxyCandidates,
-    platform: process.platform
+    platform: process.platform,
   });
 
   await testDns();

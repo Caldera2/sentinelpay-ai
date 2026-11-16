@@ -1,0 +1,18 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "module": "CommonJS",
+    "moduleResolution": "Node",
+    "outDir": "audit-output/test-build",
+    "rootDir": ".",
+    "types": ["node"],
+    "paths": {},
+    "incremental": false
+  },
+  "include": [
+    "tests/**/*.ts",
+    "apps/api/src/**/*.ts",
+    "apps/web/lib/solana/connection.ts",
+    "packages/shared/src/**/*.ts"
+  ]
+}

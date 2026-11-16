@@ -1,0 +1,9 @@
+{
+  "name": "@sentinelpay/bigint-codec",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Bounds-checked pure JavaScript compatibility implementation for bigint-buffer consumers",
+  "main": "index.cjs",
+  "types": "index.d.ts",
+  "dependencies": { "buffer": "6.0.3" }
+}

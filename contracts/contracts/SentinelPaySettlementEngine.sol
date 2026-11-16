@@ -10,7 +10,7 @@ contract SentinelPaySettlementEngine is PaymentVault {
         address payable merchant,
         bytes32 proofHash,
         string calldata track
-    ) external payable returns (uint256 requestId) {
+    ) external payable nonReentrant whenNotPaused returns (uint256 requestId) {
         require(msg.value > 0, "SentinelPay: HSK payment required");
         require(bytes(track).length > 0, "SentinelPay: track required");
 

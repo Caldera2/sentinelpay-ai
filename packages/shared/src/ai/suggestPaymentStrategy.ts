@@ -1,97 +1,38 @@
-import { getAddress } from "ethers";
+import { parseAtomic } from "../money";
 
-export type WalletAsset = {
-  symbol: string;
-  balance: number;
-  apy: number;
-  usdValue: number;
-  isRwa?: boolean;
+export type TreasuryInputs = {
+  availableUsdcAtomic: string;
+  reserveAtomic: string;
+  upcomingExpensesAtomic: string;
+  liquidBps: number;
 };
 
-export type WalletSnapshot = {
-  walletAddress: string;
-  hasNexaId: boolean;
-  assets: WalletAsset[];
-  loyaltyPointsEligible?: boolean;
-};
-
-export type PaymentIntent = {
-  walletAddress: string;
-  recommendedAsset: string;
-  shouldUseZkDiscount: boolean;
-  discountBps: number;
-  reason: string;
-  loyaltyMessage?: string;
-  track: "PayFi" | "DeFi";
-};
-
-const scoreAsset = (asset: WalletAsset) => {
-  const rwaBonus = asset.isRwa ? 80 : 0;
-  const utilityBonus = asset.symbol === "HSK" ? 15 : 0;
-  return asset.apy * 100 + rwaBonus + utilityBonus;
-};
-
-export function suggestPaymentStrategy(walletData: WalletSnapshot): PaymentIntent {
-  const normalizedAddress = getAddress(walletData.walletAddress);
-  const ownsRwa = walletData.assets.some((asset) => asset.isRwa && asset.balance > 0);
-  const spendableAssets = walletData.assets.filter((asset) => asset.balance > 0);
-  const lowestGrowthAsset = [...spendableAssets].sort((left, right) => scoreAsset(left) - scoreAsset(right))[0];
-
-  let recommendedAsset = lowestGrowthAsset?.symbol ?? "HSK";
-  let reason = `AI selected ${recommendedAsset} because it has the lowest near-term growth score in the wallet snapshot.`;
-  let loyaltyMessage: string | undefined;
-  let track: "PayFi" | "DeFi" = "PayFi";
-
-  if (ownsRwa) {
-    recommendedAsset = "HSK";
-    loyaltyMessage = "RWA holder detected. Paying in HSK earns SentinelPay loyalty points and keeps yield-bearing RWAs untouched.";
-    reason = "AI switched the payment rail to HSK because the wallet already holds RWAs, making HSK the best spend asset for points and gas efficiency.";
-  } else if ((lowestGrowthAsset?.apy ?? 0) > 0.09) {
-    track = "DeFi";
-    reason = "AI marked this as a DeFi-leaning checkout because all visible assets carry meaningful yield, so it preserves higher-growth positions.";
-  }
-
+/** Deterministic cash policy, not a forecast or an investment return promise. */
+export function suggestPaymentStrategy(input: TreasuryInputs) {
+  const balance = parseAtomic(input.availableUsdcAtomic);
+  const protectedCash =
+    parseAtomic(input.reserveAtomic) +
+    parseAtomic(input.upcomingExpensesAtomic);
+  if (
+    !Number.isInteger(input.liquidBps) ||
+    input.liquidBps < 0 ||
+    input.liquidBps > 10_000
+  )
+    throw new Error(
+      "Liquid allocation must be between 0 and 10000 basis points.",
+    );
+  const surplus = balance > protectedCash ? balance - protectedCash : 0n;
+  const requested = (balance * BigInt(10_000 - input.liquidBps)) / 10_000n;
+  const suggested = requested < surplus ? requested : surplus;
   return {
-    walletAddress: normalizedAddress,
-    recommendedAsset,
-    shouldUseZkDiscount: walletData.hasNexaId,
-    discountBps: walletData.hasNexaId ? 500 : 0,
-    reason,
-    loyaltyMessage,
-    track
+    engine: "cash-reserve-rules" as const,
+    availableUsdcAtomic: balance.toString(),
+    protectedCashAtomic: protectedCash.toString(),
+    suggestedAllocationAtomic: suggested.toString(),
+    remainingLiquidAtomic: (balance - suggested).toString(),
+    reason:
+      suggested === 0n
+        ? "Keep funds liquid: your reserve, upcoming expenses, or allocation policy leaves no eligible surplus."
+        : "This amount respects your minimum reserve, upcoming expenses, and maximum yield allocation. Review fees and provider eligibility before approving.",
   };
 }
-
-export function buildMockWalletSnapshot(walletAddress: string, hasNexaId: boolean): WalletSnapshot {
-  const normalizedAddress = getAddress(walletAddress);
-  const suffix = Number.parseInt(normalizedAddress.slice(-2), 16);
-  const holdsRwa = suffix % 2 === 0;
-
-  return {
-    walletAddress: normalizedAddress,
-    hasNexaId,
-    loyaltyPointsEligible: holdsRwa,
-    assets: [
-      {
-        symbol: "HSK",
-        balance: 128.4,
-        apy: holdsRwa ? 0.01 : 0.03,
-        usdValue: 128.4
-      },
-      {
-        symbol: "USDT",
-        balance: 420,
-        apy: 0.018,
-        usdValue: 420
-      },
-      {
-        symbol: "sRWA",
-        balance: holdsRwa ? 12 : 0,
-        apy: 0.112,
-        usdValue: holdsRwa ? 1200 : 0,
-        isRwa: true
-      }
-    ]
-  };
-}
-

@@ -1,5 +1,7 @@
-import { NextFunction, Request, Response } from "express";
-import { verifyJwt } from "../lib/jwt";
+import type { NextFunction, Request, Response } from "express";
+import type { createAuthService } from "../services/authService";
+import { readSessionCookie } from "../services/authService";
+import { HttpError } from "../lib/errors";
 
 declare global {
   namespace Express {
@@ -9,20 +11,13 @@ declare global {
   }
 }
 
-export function requireAuth(request: Request, response: Response, next: NextFunction) {
-  const header = request.headers.authorization;
-
-  if (!header?.startsWith("Bearer ")) {
-    return response.status(401).json({ error: "Missing bearer token." });
-  }
-
-  try {
-    const token = header.replace("Bearer ", "");
-    const payload = verifyJwt(token);
-    request.walletAddress = payload.walletAddress;
-    return next();
-  } catch {
-    return response.status(401).json({ error: "Invalid session token." });
-  }
+export function requireAuth(auth: ReturnType<typeof createAuthService>) {
+  return async (request: Request, _response: Response, next: NextFunction) => {
+    const wallet = await auth.session(
+      readSessionCookie(request.headers.cookie),
+    );
+    if (!wallet) throw new HttpError(401, "Sign in with your Solana wallet.");
+    request.walletAddress = wallet;
+    next();
+  };
 }
-

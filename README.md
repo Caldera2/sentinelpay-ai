@@ -1,69 +1,73 @@
-SentinelPay AI 
-SentinelPay AI is a high-performance PayFi (Payment Finance) gateway built for the Solana ecosystem. The project merges Solana Actions/Blinks for one-click settlement, an RWA-integrated payment vault, and a lightweight AI intent engine to transform idle merchant revenue into active yield-bearing assets.
+# SentinelPay
 
-Why It Matters
-SentinelPay solves the Capital Inefficiency Gap in on-chain commerce. Instead of merchant revenue sitting idle in static stablecoins, our protocol automatically routes a configurable slice of every transaction into institutional-grade RWA vaults (e.g., Ondo USDY) the moment the transaction settles.
+Solana USDC invoices and merchant cash reserve planning. Customers pay through a hosted checkout or Solana Action; the API verifies finalized transactions before recording revenue. Merchant wallets retain custody of funds.
 
-Stack
-L1 Blockchain: Solana (Mainnet-ready)
+## Implemented
 
-UX/Checkout: Solana Actions & Blinks
+- Solana Ed25519 wallet sign-in, expiring single-use challenges, and revocable one-hour HttpOnly sessions.
+- Merchant-owned invoices with fixed USDC amounts, expiry, idempotent request IDs, and separate customer checkout pages.
+- Exact integer money calculations, case-sensitive public keys/signatures, and invoice-bound transaction memos.
+- Finalized on-chain verification of payer signature, memo, time window, USDC mint, recipient account, and credited amount.
+- PostgreSQL ledger with unique receipt constraints, transactions, pagination, CSV export, and an audit trail.
+- Cash reserve recommendations from actual wallet balances and saved merchant expenses/reserves. This is a deterministic policy engine; no model or fixed yield is claimed.
+- Optional server-side Jupiter ExactOut swaps for invoice payments. ExactIn is used for optional merchant treasury swaps. Unsupported routes fail without submitting a payment.
 
-Liquidity Routing: Jupiter V6 API
+The former mock identity proofs, UI discounts, hardcoded merchant recipient, local-storage ledger, and simulated earnings are removed. No identity verification or transaction privacy guarantee is provided.
 
-Yield Generation: Ondo Finance (USDY)
+## Local setup
 
-Infrastructure: Helius RPC
+Requires Node.js 22.13 or later and npm workspaces.
 
-Frontend: Next.js + Tailwind CSS
+```sh
+npm ci
+# Copy .env.example to .env.local at the repository root.
+# Copy API_URL and API_PROXY_SECRET into apps/web/.env.local.
+npm run dev
+```
 
-Backend: Supabase (PostgreSQL) + FastAPI
+Open http://localhost:3000. The API runs on port 4000. Development defaults to **devnet** with Circle devnet USDC. Acquire devnet SOL and test USDC separately; the app does not fund wallets. Sign in with the merchant wallet, create an invoice, and pay using a different wallet.
 
-Wallet Integration: Phantom / Backpack
+When DATABASE_URL is blank in development, PGlite persists a local PostgreSQL-compatible database in apps/api/data/postgres. Do not use this single-process development store in production. Previous mock JSON records are not imported as verified receipts.
 
-Project Structure
-programs: Anchor/Rust smart contracts for the Settlement Engine.
+## Validation
 
-apps/web: Next.js frontend featuring the Merchant Dashboard, Blink generator, and RWA yield tracker.
+```sh
+npm test
+npm run typecheck
+npm run security:scan
+npm run build
+npm run test:contracts
+npm audit --omit=dev
+```
 
-apps/api: Backend handling AI intent logic and real-time transaction indexing via Supabase.
+Tests use a real in-memory PostgreSQL-compatible engine, ephemeral signing keys, HTTP requests, and synthetic Solana transaction fixtures. They do not transfer funds or claim live provider verification.
 
-packages/sdk: Shared TypeScript logic for Blink construction and Jupiter swap routing.
+## Production configuration
 
-Core Flows
-1. Atomic Settlement & RWA Routing
-The protocol utilizes a specialized settlement logic:
+Set APP_ORIGIN to the exact HTTPS web origin. Configure SOLANA_CLUSTER explicitly, SOLANA_RPC_URL for the same network, a PostgreSQL DATABASE_URL, and a unique API_PROXY_SECRET of at least 32 characters. Set the same proxy secret and the API's HTTPS API_URL on the web server. Keep all provider/database secrets server-side. No NEXT_PUBLIC secrets are needed.
 
-Split-to-Yield: Every payment can be split between the merchant's liquid wallet and a yield-bearing RWA vault.
+Run `npm run db:migrate` explicitly before starting the production API. The API does not silently migrate or recreate a production ledger. Use a dedicated database role, verified TLS, backups, and a single API process; a shared rate-limit store is needed before horizontal scaling. The web proxies only supported endpoints, and the API requires the proxy credential in production.
 
-Atomic Swaps: Uses Jupiter V6 to perform atomic User Token -> USDC -> USDY swaps in a single transaction.
+```sh
+npm run build
+npm run start:api
+npm run start --workspace @sentinelpay/web
+```
 
-Native Blinks: Transactions are packaged as Solana Blinks, allowing checkout to happen directly on social media platforms.
+Railway configuration builds only shared/API workspaces; the web is a separate Next.js deployment. See [AUDIT.md](AUDIT.md) for findings, validation evidence, and remaining launch prerequisites. Vercel client addresses are forwarded through the authenticated proxy for individual rate limits; other hosting setups share limits by proxy address until a trusted client-address integration is configured.
 
-2. AI Intent Engine
-The strategy engine analyzes merchant liquidity and market yield data to:
+## Swaps and treasury
 
-Recommend Yield Splits: Optimizes the percentage of revenue routed to RWAs based on the merchant's upcoming cash-flow needs.
+Direct USDC payments work without Jupiter. Mainnet token swaps additionally require JUPITER_API_KEY. The invoice path intentionally retains Jupiter's V1 ExactOut contract: V2 `/build` supports ExactIn and cannot be substituted without preserving invoice amount guarantees. If V1 is unavailable or changes its contract, swap checkout fails closed and direct USDC remains available.
 
-Fee Optimization: Automatically chooses the most efficient liquidity path via Jupiter to minimize slippage during settlement.
+Treasury trading is off by default. Enabling TREASURY_ENABLED requires mainnet, JUPITER_API_KEY, an independently verified official SOLANA_RWA_MINT, and a review of the provider's eligibility, liquidity, and redemption rules. Eligibility acknowledgment is a merchant declaration, not KYC or a credential proof. Each swap requires the merchant wallet signature. USDY acquisition/exit through a swap pool is distinct from issuer minting/redemption. The app does not promise a rate of return or perform unattended sweeps.
 
-3. High-Performance Infrastructure
-Helius RPC: Utilizes dedicated rpc_ keys for high-velocity transaction simulation and landing rates.
+Useful primary references: [Jupiter migration](https://developers.jup.ag/docs/swap/migration/metis-to-build), [Solana transaction RPC](https://solana.com/docs/rpc/http/gettransaction), [Ondo USDY](https://ondo.finance/usdy).
 
-Resilient Connections: Implements singleton connection patterns with automated failover to ensure 100% uptime during high network congestion.
+## Legacy EVM code
 
-Local Development
-Set NEXT_PUBLIC_SOLANA_RPC_URL in .env with your Helius RPC Key.
+The contracts directory is a legacy HashKey experiment, independent of the active Solana payment flow. Its contracts are not used to secure Solana invoices. Compile separately with `npm run build:contracts`; no deployment or funded transaction is part of normal development/testing. Do not use the former production keypair or credentials.
 
-Define NEXT_PUBLIC_SOLANA_TREASURY_ADDRESS to route platform fees.
+## Exposed credentials
 
-Install dependencies using your workspace-aware package manager.
-
-Run npm run dev to launch the Merchant Dashboard.
-
-Future Roadmap
-Dynamic Fee Splits: Support for complex, multi-party settlement policies.
-
-Institutional Reporting: Real-time post-trade reporting for RWA tax compliance.
-
-Advanced AI Treasury: Moving from simple heuristics to full policy-based treasury optimization for SMEs.
+An earlier version committed a deployment keypair and a production environment export. Their working-tree copies are removed and ignored. Git history and external copies still contain that material. Replace any signing keys that retain authority, revoke any still-valid credentials, and coordinate any Git history rewrite with repository collaborators. Removing files is not credential rotation.

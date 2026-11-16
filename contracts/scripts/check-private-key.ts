@@ -1,19 +1,25 @@
 import { config as loadEnv } from "dotenv";
+import path from "node:path";
 
-loadEnv({ path: "../.env" });
-loadEnv();
+const root = path.resolve(__dirname, "../..");
+loadEnv({ path: path.join(root, ".env.local") });
+loadEnv({ path: path.join(root, ".env") });
 
 const privateKey = process.env.PRIVATE_KEY ?? "";
-const sanitizedKey = privateKey.startsWith("0x") ? privateKey.slice(2) : privateKey;
+const sanitizedKey = privateKey.startsWith("0x")
+  ? privateKey.slice(2)
+  : privateKey;
 
 if (!privateKey.trim()) {
-  console.warn("SentinelPay: PRIVATE_KEY is not set yet. Add it to contracts/.env or ../.env before deploying to hashkey.");
+  console.warn("SentinelPay: the legacy PRIVATE_KEY is not configured.");
   process.exit(1);
 }
 
 if (!/^[0-9a-fA-F]{64}$/.test(sanitizedKey)) {
-  console.warn("SentinelPay: PRIVATE_KEY is set, but it doesn't look like a full 32-byte hex key yet. Update contracts/.env or ../.env before deploying.");
+  console.warn(
+    "SentinelPay: the legacy PRIVATE_KEY must contain 32 hex-encoded bytes.",
+  );
   process.exit(1);
 }
 
-console.log("SentinelPay: PRIVATE_KEY looks valid. You're ready to deploy.");
+console.log("SentinelPay: legacy PRIVATE_KEY has the expected hex format.");

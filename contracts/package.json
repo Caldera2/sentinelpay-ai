@@ -3,10 +3,11 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "build": "hardhat compile",
+    "build": "node ../scripts/compile-contracts.cjs",
+    "test": "hardhat test --network hardhat --no-compile",
     "dev": "hardhat node",
     "check-private-key": "node scripts/check-private-key.mjs",
-    "deploy-and-test": "hardhat run scripts/deploy-and-test.ts --network hashkey"
+    "deploy:legacy": "hardhat run scripts/deploy.ts --network hashkeyTestnet"
   },
   "dependencies": {
     "@openzeppelin/contracts": "^5.1.0",
@@ -14,7 +15,10 @@
     "ethers": "^6.13.5"
   },
   "devDependencies": {
-    "@nomicfoundation/hardhat-toolbox": "npm:@nomicfoundation/hardhat-toolbox@hh2",
+    "@nomicfoundation/hardhat-ethers": "^3.1.0",
+    "@nomicfoundation/hardhat-chai-matchers": "^2.1.0",
+    "chai": "^4.5.0",
+    "solc": "0.8.26",
     "hardhat": "2.28.6",
     "ts-node": "^10.9.2"
   }
