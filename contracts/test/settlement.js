@@ -1,5 +1,6 @@
-const { expect } = require("chai");
-const { ethers } = require("hardhat");
+import { expect } from "chai";
+import { network } from "hardhat";
+const { ethers } = await network.create();
 
 describe("Legacy settlement security", function () {
   async function fixture() {
@@ -39,7 +40,7 @@ describe("Legacy settlement security", function () {
       engine
         .connect(payer)
         .processPayment(merchant.address, proof, "PayFi", { value: 10000 }),
-    ).to.changeEtherBalances([merchant, vault], [8500, 1500]);
+    ).to.changeEtherBalances(ethers, [merchant, vault], [8500, 1500]);
     expect((await engine.paymentRequests(0)).settled).to.equal(true);
   });
   it("revoked proofs and paused payments are refused", async function () {
@@ -49,14 +50,14 @@ describe("Legacy settlement security", function () {
       engine
         .connect(payer)
         .processPayment(merchant.address, proof, "PayFi", { value: 100 }),
-    ).to.be.reverted;
+    ).to.revert(ethers);
     await engine.registerProof(payer.address, proof);
     await engine.pause();
     await expect(
       engine
         .connect(payer)
         .processPayment(merchant.address, proof, "PayFi", { value: 100 }),
-    ).to.be.reverted;
+    ).to.revert(ethers);
   });
   it("requires settlement authority and snapshots the recipient at request creation", async function () {
     const { engine, payer, merchant, vault, replacement, outsider, proof } =
@@ -69,10 +70,14 @@ describe("Legacy settlement security", function () {
       engine
         .connect(outsider)
         .settleWithRWA(0, ethers.ZeroHash, { value: 10000 }),
-    ).to.be.reverted;
+    ).to.revert(ethers);
     await expect(
       engine.settleWithRWA(0, ethers.ZeroHash, { value: 10000 }),
-    ).to.changeEtherBalances([merchant, vault, replacement], [8500, 1500, 0]);
+    ).to.changeEtherBalances(
+      ethers,
+      [merchant, vault, replacement],
+      [8500, 1500, 0],
+    );
     await expect(
       engine.settleWithRWA(0, ethers.ZeroHash, { value: 10000 }),
     ).to.be.revertedWith("SentinelPay: already settled");

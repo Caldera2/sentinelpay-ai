@@ -25,8 +25,12 @@ export async function reconcilePaymentsOnce(
       );
       for (const signature of signatures) {
         try {
-          const result=await invoices.confirm(attempt.invoice_id, attempt.id, signature);
-          if(result.recorded)verified++;
+          const result = await invoices.confirm(
+            attempt.invoice_id,
+            attempt.id,
+            signature,
+          );
+          if (result.recorded) verified++;
         } catch (error) {
           if (
             !(error instanceof HttpError) ||
@@ -53,19 +57,50 @@ export async function reconcilePaymentsOnce(
   return verified;
 }
 
-export async function reconcileRefundsOnce(db:Database,chain:Chain,refunds:ReturnType<typeof createRefundService>){
-  const pending=await db.query<{id:string;merchant_wallet:string;memo:string;submitted_signature:string|null}>("SELECT id,merchant_wallet,memo,submitted_signature FROM refunds WHERE status='prepared' ORDER BY COALESCE(last_checked_at,created_at),id LIMIT 25");
-  let verified=0;
-  for(const item of pending.rows){
-    try{
-      const candidates=[...new Set([...(item.submitted_signature?[item.submitted_signature]:[]),...await chain.findReceipts(paymentReference(item.memo).toBase58())])];
-      for(const signature of candidates){
-        try{await refunds.confirm(item.merchant_wallet,item.id,signature);verified++;break;}
-        catch(error){if(!(error instanceof HttpError)||![202,422].includes(error.status))throw error;}
+export async function reconcileRefundsOnce(
+  db: Database,
+  chain: Chain,
+  refunds: ReturnType<typeof createRefundService>,
+) {
+  const pending = await db.query<{
+    id: string;
+    merchant_wallet: string;
+    memo: string;
+    submitted_signature: string | null;
+  }>(
+    "SELECT id,merchant_wallet,memo,submitted_signature FROM refunds WHERE status='prepared' ORDER BY COALESCE(last_checked_at,created_at),id LIMIT 25",
+  );
+  let verified = 0;
+  for (const item of pending.rows) {
+    try {
+      const candidates = [
+        ...new Set([
+          ...(item.submitted_signature ? [item.submitted_signature] : []),
+          ...(await chain.findReceipts(paymentReference(item.memo).toBase58())),
+        ]),
+      ];
+      for (const signature of candidates) {
+        try {
+          await refunds.confirm(item.merchant_wallet, item.id, signature);
+          verified++;
+          break;
+        } catch (error) {
+          if (
+            !(error instanceof HttpError) ||
+            ![202, 422].includes(error.status)
+          )
+            throw error;
+        }
       }
-    }catch{console.warn("Refund reconciliation will retry an unavailable receipt.");}
-    finally{await db.query("UPDATE refunds SET last_checked_at=now() WHERE id=$1",[item.id]);}
-  }return verified;
+    } catch {
+      console.warn("Refund reconciliation will retry an unavailable receipt.");
+    } finally {
+      await db.query("UPDATE refunds SET last_checked_at=now() WHERE id=$1", [
+        item.id,
+      ]);
+    }
+  }
+  return verified;
 }
 
 export function startReconciler(
@@ -77,7 +112,10 @@ export function startReconciler(
   let running: Promise<unknown> | null = null;
   const timer = setInterval(() => {
     if (!running)
-      running = reconcilePaymentsOnce(db, chain, invoices).then(()=>refunds?reconcileRefundsOnce(db,chain,refunds):undefined)
+      running = reconcilePaymentsOnce(db, chain, invoices)
+        .then(() =>
+          refunds ? reconcileRefundsOnce(db, chain, refunds) : undefined,
+        )
         .catch(() => console.warn("Payment reconciliation will retry."))
         .finally(() => {
           running = null;

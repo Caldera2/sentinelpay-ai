@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
-import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
+import { WalletMultiButton } from "./wallet-button";
 import { Transaction, VersionedTransaction } from "@solana/web3.js";
 import {
   encodeBase58,
@@ -48,10 +48,14 @@ export function PaymentCheckout({ invoiceId }: { invoiceId: string }) {
     }
   }, [key]);
   async function reconcile(payment: Pending) {
-    const result = await fetchApiJson<{ pending: boolean; invoice?: Invoice;duplicate?:boolean }>(
-      `/public/invoices/${invoiceId}/confirm`,
-      { method: "POST", body: JSON.stringify(payment) },
-    );
+    const result = await fetchApiJson<{
+      pending: boolean;
+      invoice?: Invoice;
+      duplicate?: boolean;
+    }>(`/public/invoices/${invoiceId}/confirm`, {
+      method: "POST",
+      body: JSON.stringify(payment),
+    });
     if (result.pending) {
       setMessage(
         "Payment submitted. Waiting for final confirmation; keep this receipt and check again.",
@@ -60,7 +64,11 @@ export function PaymentCheckout({ invoiceId }: { invoiceId: string }) {
     }
     sessionStorage.removeItem(key);
     setPending(null);
-    setMessage(result.duplicate?"This additional transfer was received and recorded. Contact the merchant about a refund; do not pay again.":"Payment verified on-chain. Your receipt is ready.");
+    setMessage(
+      result.duplicate
+        ? "This additional transfer was received and recorded. Contact the merchant about a refund; do not pay again."
+        : "Payment verified on-chain. Your receipt is ready.",
+    );
     await invoice.refetch();
   }
   async function pay() {

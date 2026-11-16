@@ -26,7 +26,10 @@ export function createDatabase(
       connect_timeout: 10,
       idle_timeout: 30,
       ssl: config.production ? { rejectUnauthorized: true } : false,
-      connection: { search_path: config.schema || "public", client_min_messages: "warning" },
+      connection: {
+        search_path: config.schema || "public",
+        client_min_messages: "warning",
+      },
     });
     const client = (sql: Pick<typeof pool, "unsafe">): Sql => ({
       query: async <T>(statement: string, params: unknown[] = []) => ({
@@ -167,11 +170,22 @@ export async function migrate(db: Database) {
       .map((part) => part.trim())
       .filter(Boolean))
       await tx.query(statement);
-    await tx.query("SELECT version FROM schema_migrations WHERE version=1 FOR UPDATE");
-    const current = await tx.query("SELECT version FROM schema_migrations WHERE version=$1", [SCHEMA_VERSION]);
+    await tx.query(
+      "SELECT version FROM schema_migrations WHERE version=1 FOR UPDATE",
+    );
+    const current = await tx.query(
+      "SELECT version FROM schema_migrations WHERE version=$1",
+      [SCHEMA_VERSION],
+    );
     if (!current.rows.length) {
-      for (const statement of receiptSchema.split(";").map((part) => part.trim()).filter(Boolean)) await tx.query(statement);
-      await tx.query("INSERT INTO schema_migrations(version) VALUES($1)", [SCHEMA_VERSION]);
+      for (const statement of receiptSchema
+        .split(";")
+        .map((part) => part.trim())
+        .filter(Boolean))
+        await tx.query(statement);
+      await tx.query("INSERT INTO schema_migrations(version) VALUES($1)", [
+        SCHEMA_VERSION,
+      ]);
     }
   });
 }

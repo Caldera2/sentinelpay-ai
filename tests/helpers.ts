@@ -34,7 +34,7 @@ export function signingWallet() {
 export async function database(initialize = true) {
   if (!config.databaseUrl) {
     const db = createDatabase(config);
-    if(initialize)await migrate(db);
+    if (initialize) await migrate(db);
     return db;
   }
   const schema = `sp_test_${randomUUID().replace(/-/g, "")}`;
@@ -43,7 +43,7 @@ export async function database(initialize = true) {
   const admin = createDatabase(config);
   await admin.query(`CREATE SCHEMA "${schema}"`);
   const db = createDatabase({ ...config, schema });
-  if(initialize)await migrate(db);
+  if (initialize) await migrate(db);
   return {
     ...db,
     close: async () => {

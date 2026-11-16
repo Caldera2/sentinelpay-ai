@@ -8,7 +8,8 @@ Solana USDC invoices and merchant cash reserve planning. Customers pay through a
 - Merchant-owned invoices with fixed USDC amounts, expiry, idempotent request IDs, and separate customer checkout pages.
 - Exact integer money calculations, case-sensitive public keys/signatures, and invoice-bound transaction memos.
 - Finalized on-chain verification of payer signature, memo, time window, USDC mint, recipient account, and credited amount.
-- PostgreSQL ledger with unique receipt constraints, transactions, pagination, CSV export, and an audit trail.
+- PostgreSQL receipt ledger with unique signatures, duplicate/overpayment tracking, transactions, pagination, CSV export, and an audit trail.
+- Merchant-signed partial and full USDC refunds to the original verified payer, with receipt recovery and net revenue accounting.
 - Cash reserve recommendations from actual wallet balances and saved merchant expenses/reserves. This is a deterministic policy engine; no model or fixed yield is claimed.
 - Optional server-side Jupiter ExactOut swaps for invoice payments. ExactIn is used for optional merchant treasury swaps. Unsupported routes fail without submitting a payment.
 
@@ -16,10 +17,10 @@ The former mock identity proofs, UI discounts, hardcoded merchant recipient, loc
 
 ## Local setup
 
-Requires Node.js 22.13 or later and npm workspaces.
+Requires Node.js 22.13 or later and npm 11.21.2. CI and the API deployment install use the pinned npm version so local workspace security overrides are applied consistently.
 
 ```sh
-npm ci
+npx --yes npm@11.21.2 ci
 # Copy .env.example to .env.local at the repository root.
 # Copy API_URL and API_PROXY_SECRET into apps/web/.env.local.
 npm run dev
@@ -37,16 +38,22 @@ npm run typecheck
 npm run security:scan
 npm run build
 npm run test:contracts
-npm audit --omit=dev
+npm run security:audit
 ```
 
-Tests use a real in-memory PostgreSQL-compatible engine, ephemeral signing keys, HTTP requests, and synthetic Solana transaction fixtures. They do not transfer funds or claim live provider verification.
+By default, the regression suite uses PGlite. Set `TEST_DATABASE_URL` to run the same suite against a real PostgreSQL server; each test file uses its own temporary schema. The database role needs permission to create and drop those schemas. CI exercises both engines.
+
+For the automated browser flow, set `TEST_DATABASE_URL` to a **local** PostgreSQL database, install Chromium with `npx playwright install chromium`, then run `npm run test:browser`. On Windows, `PLAYWRIGHT_SYSTEM_CHROME=1` selects an installed Chrome instead. The runner starts isolated API/web fixtures and exercises wallet sign-in, invoice checkout, a lost broadcast response, partial/full refunds, reload persistence, and sign-out. Its generated wallet keys and simulated chain exist only in the test environment; no real wallet or funds are used. Jupiter contract tests mock provider responses and verify quote constraints and composed transaction instructions.
+
+See [AUDIT.md](AUDIT.md) for actual database, browser, build, contract, and live dependency scan results. Test artifacts are written under the ignored `audit-output/` directory.
+
+The production dependency scan is clean. Raw `npm audit` still reports one upstream Zod 3 advisory through six legacy Hardhat packages. The complete CI check permits only the documented development-only exception and rejects other findings. See [dependency review](security/DEPENDENCIES.md).
 
 ## Production configuration
 
 Set APP_ORIGIN to the exact HTTPS web origin. Configure SOLANA_CLUSTER explicitly, SOLANA_RPC_URL for the same network, a PostgreSQL DATABASE_URL, and a unique API_PROXY_SECRET of at least 32 characters. Set the same proxy secret and the API's HTTPS API_URL on the web server. Keep all provider/database secrets server-side. No NEXT_PUBLIC secrets are needed.
 
-Run `npm run db:migrate` explicitly before starting the production API. The API does not silently migrate or recreate a production ledger. Use a dedicated database role, verified TLS, backups, and a single API process; a shared rate-limit store is needed before horizontal scaling. The web proxies only supported endpoints, and the API requires the proxy credential in production.
+Run `npm run db:migrate` explicitly before starting the production API. Schema version 2 preserves existing verified receipts, adds the receipt/refund ledger, and removes sessions/challenges belonging to the retired signing address. The API does not silently migrate or recreate a production ledger. Use a dedicated database role, verified TLS, backups, and a single API process; a shared rate-limit store is needed before horizontal scaling. The web proxies only supported endpoints, and the API requires the proxy credential in production.
 
 ```sh
 npm run build
@@ -64,10 +71,16 @@ Treasury trading is off by default. Enabling TREASURY_ENABLED requires mainnet, 
 
 Useful primary references: [Jupiter migration](https://developers.jup.ag/docs/swap/migration/metis-to-build), [Solana transaction RPC](https://solana.com/docs/rpc/http/gettransaction), [Ondo USDY](https://ondo.finance/usdy).
 
+## Refunds and duplicate payments
+
+Every verified incoming signature is recorded. The first receipt pays the invoice; additional transfers remain visible as excess funds rather than inflating revenue. A merchant can refund up to the unrefunded amount of each receipt. The destination is fixed to its original payer, and every refund needs the merchant wallet signature and a finalized receipt. Returning overpayment or a duplicate transfer reduces excess liability first; returning invoice funds reduces net invoice revenue.
+
+Only one refund can remain pending per merchant. A submitted signature is retained before broadcast, and reconciliation recovers finalized refunds when a browser callback is lost. Uncertain settlement prevents replacement; older unresolved refunds require receipt investigation. This ledger covers supported, verified invoice/refund transactions, not arbitrary transfers made outside the application.
+
 ## Legacy EVM code
 
 The contracts directory is a legacy HashKey experiment, independent of the active Solana payment flow. Its contracts are not used to secure Solana invoices. Compile separately with `npm run build:contracts`; no deployment or funded transaction is part of normal development/testing. Do not use the former production keypair or credentials.
 
 ## Exposed credentials
 
-An earlier version committed a deployment keypair and a production environment export. Their working-tree copies are removed and ignored. Git history and external copies still contain that material. Replace any signing keys that retain authority, revoke any still-valid credentials, and coordinate any Git history rewrite with repository collaborators. Removing files is not credential rotation.
+An earlier version committed a deployment keypair and a production environment export. Their working-tree copies are removed and ignored, and the signing address is permanently retired within the application. The exported Vercel token is expired; the RPC value was confirmed to be a placeholder. Live devnet/mainnet checks found no account, owned token accounts, or upgradeable-program authority for the exposed address. See [the exposure review](security/EXPOSURE_REVIEW.md) for evidence and the exact limits of those checks. Git history still contains retired material; never reuse it. No Git history rewrite or unrelated account changes were performed.

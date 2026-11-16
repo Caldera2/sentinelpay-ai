@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useWallet } from "@solana/wallet-adapter-react";
-import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
+import { WalletMultiButton } from "./wallet-button";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Button, Card } from "./ui";

@@ -19,7 +19,11 @@ export const walletSchema = z
   .refine((address) => {
     try {
       const key = new PublicKey(address);
-      return key.toBase58() === address && PublicKey.isOnCurve(key.toBytes()) && !isCompromisedWallet(address);
+      return (
+        key.toBase58() === address &&
+        PublicKey.isOnCurve(key.toBytes()) &&
+        !isCompromisedWallet(address)
+      );
     } catch {
       return false;
     }

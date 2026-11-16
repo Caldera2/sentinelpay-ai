@@ -15,8 +15,9 @@ async function main() {
       "Legacy RPC, reviewed vault address, and a new private key are required.",
     );
   const vault = getAddress(process.env.RWA_VAULT_ADDRESS);
-  const [deployer] = await hre.ethers.getSigners();
-  const factory = await hre.ethers.getContractFactory(
+  const { ethers } = await hre.network.create();
+  const [deployer] = await ethers.getSigners();
+  const factory = await ethers.getContractFactory(
     "SentinelPaySettlementEngine",
   );
   const engine = await factory.deploy(deployer.address, vault, 0);

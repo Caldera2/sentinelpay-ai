@@ -11,7 +11,8 @@ async function main() {
   const db = createDatabase(config);
   if (!config.production) await migrate(db);
   const schema = await db.query(
-    "SELECT version FROM schema_migrations WHERE version=$1",[SCHEMA_VERSION],
+    "SELECT version FROM schema_migrations WHERE version=$1",
+    [SCHEMA_VERSION],
   );
   if (!schema.rows.length) throw new Error("Database migrations are required.");
   const chain = createChain(config);
@@ -19,7 +20,7 @@ async function main() {
     db,
     chain,
     createInvoiceService(db, chain, config),
-    createRefundService(db,chain,config),
+    createRefundService(db, chain, config),
   );
   const server = createApp(db, chain, config).listen(config.port, () =>
     console.log(
@@ -40,7 +41,10 @@ void main().catch((error) => {
   console.error(
     "API startup failed",
     error instanceof Error
-      ? error.message.replace(/(?:https?|postgres(?:ql)?|wss?):\/\/\S+/gi, "[redacted URL]")
+      ? error.message.replace(
+          /(?:https?|postgres(?:ql)?|wss?):\/\/\S+/gi,
+          "[redacted URL]",
+        )
       : "Configuration error",
   );
   process.exitCode = 1;

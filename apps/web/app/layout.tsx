@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import "./globals.css";
-import "@solana/wallet-adapter-react-ui/styles.css";
+import "../styles/wallet-adapter.css";
 import { Providers } from "../components/providers";
 import { SolanaProvider } from "../components/providers/SolanaProvider";
 
@@ -13,7 +13,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" data-scroll-behavior="smooth">
       <body className="bg-background text-foreground antialiased">
         <SolanaProvider>
           <Providers>{children}</Providers>

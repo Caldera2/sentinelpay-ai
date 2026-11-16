@@ -2,9 +2,10 @@
   "name": "@sentinelpay/contracts",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "scripts": {
     "build": "node ../scripts/compile-contracts.cjs",
-    "test": "hardhat test --network hardhat --no-compile",
+    "test": "hardhat test mocha --network hardhat --no-compile",
     "dev": "hardhat node",
     "check-private-key": "node scripts/check-private-key.mjs",
     "deploy:legacy": "hardhat run scripts/deploy.ts --network hashkeyTestnet"
@@ -15,11 +16,12 @@
     "ethers": "^6.13.5"
   },
   "devDependencies": {
-    "@nomicfoundation/hardhat-ethers": "^3.1.0",
-    "@nomicfoundation/hardhat-chai-matchers": "^2.1.0",
-    "chai": "^4.5.0",
+    "@nomicfoundation/hardhat-ethers": "^4.2.2",
+    "@nomicfoundation/hardhat-ethers-chai-matchers": "^3.0.13",
+    "@nomicfoundation/hardhat-mocha": "^4.0.1",
+    "mocha": "^12.0.3",
+    "chai": "^6.3.0",
     "solc": "0.8.26",
-    "hardhat": "2.28.6",
-    "ts-node": "^10.9.2"
+    "hardhat": "3.22.0"
   }
 }

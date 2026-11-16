@@ -92,8 +92,12 @@ export function createApp(db: Database, chain: Chain, config: AppConfig) {
     next();
   });
   app.get("/health", async (_req, res) => {
-    const migration = await db.query("SELECT version FROM schema_migrations WHERE version=$1", [SCHEMA_VERSION]);
-    if(!migration.rows.length)throw new HttpError(503,"Database migration is required.");
+    const migration = await db.query(
+      "SELECT version FROM schema_migrations WHERE version=$1",
+      [SCHEMA_VERSION],
+    );
+    if (!migration.rows.length)
+      throw new HttpError(503, "Database migration is required.");
     res.json({ ok: true, service: "sentinelpay-api" });
   });
   app.use((req, _res, next) => {
@@ -352,18 +356,61 @@ export function createApp(db: Database, chain: Chain, config: AppConfig) {
         ].join("\r\n"),
       );
   });
-  app.get("/refunds/pending",protectedRoute,async(req,res)=>res.json(await refunds.pending(req.walletAddress!)));
-  app.get("/refunds/history",protectedRoute,async(req,res)=>{const {limit,offset}=pagination.parse(req.query);res.json({items:await refunds.history(req.walletAddress!,limit,offset)});});
-  app.post("/refunds/transaction",protectedRoute,async(req,res)=>{
-    const body=z.object({receiptId:uuid,amountUsdc:money,reason:z.string().trim().min(1).max(500),requestId:uuid}).strict().parse(req.body);
-    if(parseUsdc(body.amountUsdc,true)===0n)throw new HttpError(400,"Refund amount must be positive.");
-    res.json(await refunds.prepare(req.walletAddress!,body.receiptId,body.amountUsdc,body.reason,body.requestId));
+  app.get("/refunds/pending", protectedRoute, async (req, res) =>
+    res.json(await refunds.pending(req.walletAddress!)),
+  );
+  app.get("/refunds/history", protectedRoute, async (req, res) => {
+    const { limit, offset } = pagination.parse(req.query);
+    res.json({
+      items: await refunds.history(req.walletAddress!, limit, offset),
+    });
   });
-  app.post("/refunds/:id/confirm",protectedRoute,async(req,res)=>{
-    const body=z.object({signature:z.string().min(64).max(88).regex(/^[1-9A-HJ-NP-Za-km-z]+$/)}).strict().parse(req.body);
-    res.json(await refunds.confirm(req.walletAddress!,uuid.parse(req.params.id),body.signature));
+  app.post("/refunds/transaction", protectedRoute, async (req, res) => {
+    const body = z
+      .object({
+        receiptId: uuid,
+        amountUsdc: money,
+        reason: z.string().trim().min(1).max(500),
+        requestId: uuid,
+      })
+      .strict()
+      .parse(req.body);
+    if (parseUsdc(body.amountUsdc, true) === 0n)
+      throw new HttpError(400, "Refund amount must be positive.");
+    res.json(
+      await refunds.prepare(
+        req.walletAddress!,
+        body.receiptId,
+        body.amountUsdc,
+        body.reason,
+        body.requestId,
+      ),
+    );
   });
-  app.post("/refunds/:id/expire",protectedRoute,async(req,res)=>res.json(await refunds.expire(req.walletAddress!,uuid.parse(req.params.id))));
+  app.post("/refunds/:id/confirm", protectedRoute, async (req, res) => {
+    const body = z
+      .object({
+        signature: z
+          .string()
+          .min(64)
+          .max(88)
+          .regex(/^[1-9A-HJ-NP-Za-km-z]+$/),
+      })
+      .strict()
+      .parse(req.body);
+    res.json(
+      await refunds.confirm(
+        req.walletAddress!,
+        uuid.parse(req.params.id),
+        body.signature,
+      ),
+    );
+  });
+  app.post("/refunds/:id/expire", protectedRoute, async (req, res) =>
+    res.json(
+      await refunds.expire(req.walletAddress!, uuid.parse(req.params.id)),
+    ),
+  );
   app.get("/treasury/balance", protectedRoute, async (req, res) =>
     res.json({
       availableUsdcAtomic: await chain.balance(
@@ -475,12 +522,10 @@ export function createApp(db: Database, chain: Chain, config: AppConfig) {
     res.json({ ...result, id: body.id });
   });
   app.use("/zk", (_req, res) =>
-    res
-      .status(410)
-      .json({
-        error:
-          "Identity proof verification is not implemented. No identity or privacy status is issued.",
-      }),
+    res.status(410).json({
+      error:
+        "Identity proof verification is not implemented. No identity or privacy status is issued.",
+    }),
   );
   app.use((_req, res) =>
     res.status(404).json({ error: "Endpoint not found." }),
@@ -491,24 +536,20 @@ export function createApp(db: Database, chain: Chain, config: AppConfig) {
       return;
     }
     if (error instanceof ZodError) {
-      res
-        .status(400)
-        .json({
-          error: "Invalid request.",
-          fields: error.issues.map((issue) => ({
-            path: issue.path.join("."),
-            message: issue.message,
-          })),
-        });
+      res.status(400).json({
+        error: "Invalid request.",
+        fields: error.issues.map((issue) => ({
+          path: issue.path.join("."),
+          message: issue.message,
+        })),
+      });
       return;
     }
     if (error instanceof HttpError) {
-      res
-        .status(error.status)
-        .json({
-          error: error.message,
-          ...(error.code ? { code: error.code } : {}),
-        });
+      res.status(error.status).json({
+        error: error.message,
+        ...(error.code ? { code: error.code } : {}),
+      });
       return;
     }
     if (error?.type === "entity.parse.failed") {
@@ -531,13 +572,11 @@ export function createApp(db: Database, chain: Chain, config: AppConfig) {
       type: error?.name || "Error",
       code: error?.code || "unknown",
     });
-    res
-      .status(503)
-      .json({
-        error:
-          "Service temporarily unavailable. Retry status checks before sending another payment.",
-        requestId: res.locals.requestId,
-      });
+    res.status(503).json({
+      error:
+        "Service temporarily unavailable. Retry status checks before sending another payment.",
+      requestId: res.locals.requestId,
+    });
   };
   app.use(errors);
   return app;

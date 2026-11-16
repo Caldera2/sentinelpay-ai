@@ -2,6 +2,7 @@
   "name": "sentinelpay-ai",
   "version": "0.1.0",
   "private": true,
+  "packageManager": "npm@11.21.2",
   "workspaces": [
     "apps/*",
     "packages/*",
@@ -19,7 +20,10 @@
     "test:contracts": "npm run build:contracts && npm run test --workspace @sentinelpay/contracts",
     "typecheck": "tsc -p packages/shared/tsconfig.json --noEmit && tsc -p apps/api/tsconfig.json --noEmit && tsc -p apps/web/tsconfig.json --noEmit",
     "security:scan": "node scripts/security-scan.mjs",
-    "db:migrate": "npm run db:migrate --workspace @sentinelpay/api"
+    "security:audit": "node scripts/audit-dependencies.mjs",
+    "db:migrate": "npm run db:migrate --workspace @sentinelpay/api",
+    "security:review": "npm run build --workspace @sentinelpay/shared && node scripts/review-exposure.mjs --online",
+    "test:browser": "npm run build --workspace @sentinelpay/shared && tsc -p tsconfig.tests.json && playwright test"
   },
   "devDependencies": {
     "@playwright/test": "^1.65.1",
@@ -28,11 +32,15 @@
     "typescript": "^5.7.2"
   },
   "engines": {
-    "node": ">=22.13.0"
+    "node": ">=22.13.0",
+    "npm": ">=11.21.2 <12"
   },
   "overrides": {
     "bigint-buffer": "file:./packages/bigint-codec",
     "jayson": "5.0.0",
-    "uuid": "^11.1.1"
+    "uuid": "^11.1.1",
+    "tmp": "^0.2.7",
+    "glob": "^14.0.6",
+    "minimatch": "^11.0.8"
   }
 }

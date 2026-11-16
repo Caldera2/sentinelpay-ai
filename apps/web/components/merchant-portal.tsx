@@ -3,7 +3,7 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
-import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
+import { WalletMultiButton } from "./wallet-button";
 import { VersionedTransaction } from "@solana/web3.js";
 import {
   encodeBase58,
@@ -387,7 +387,9 @@ export function MerchantPortal() {
   const [amount, setAmount] = useState("");
   const [offset, setOffset] = useState(0);
   const [historyOffset, setHistoryOffset] = useState(0);
-  const [refundReceipt, setRefundReceipt] = useState<PaymentRecord | null>(null);
+  const [refundReceipt, setRefundReceipt] = useState<PaymentRecord | null>(
+    null,
+  );
   const createId = useRef<string | null>(null);
   const merchant = useQuery({
     queryKey: ["merchant", address],
@@ -420,9 +422,13 @@ export function MerchantPortal() {
     queryKey: ["summary", address],
     enabled: authorized,
     queryFn: () =>
-      fetchApiJson<{ revenueAtomic: string; paymentCount: number; grossRevenueAtomic:string;refundedInvoiceAtomic:string;outstandingExcessAtomic:string }>(
-        "/payments/summary",
-      ),
+      fetchApiJson<{
+        revenueAtomic: string;
+        paymentCount: number;
+        grossRevenueAtomic: string;
+        refundedInvoiceAtomic: string;
+        outstandingExcessAtomic: string;
+      }>("/payments/summary"),
     retry: false,
   });
   const balance = useQuery({
@@ -554,9 +560,7 @@ export function MerchantPortal() {
             </div>
             <div className="grid gap-4 md:grid-cols-3">
               <Card>
-                <p className="text-sm text-slate-400">
-                  Net invoice revenue
-                </p>
+                <p className="text-sm text-slate-400">Net invoice revenue</p>
                 <p className="mt-3 break-all text-2xl">
                   {summary.data
                     ? `${formatUsdc(summary.data.revenueAtomic)} USDC`
@@ -564,7 +568,13 @@ export function MerchantPortal() {
                       ? "Unavailable"
                       : "Loading…"}
                 </p>
-                {summary.data && <p className="mt-2 text-xs text-slate-400">Gross {formatUsdc(summary.data.grossRevenueAtomic)} · Refunded {formatUsdc(summary.data.refundedInvoiceAtomic)} USDC</p>}
+                {summary.data && (
+                  <p className="mt-2 text-xs text-slate-400">
+                    Gross {formatUsdc(summary.data.grossRevenueAtomic)} ·
+                    Refunded {formatUsdc(summary.data.refundedInvoiceAtomic)}{" "}
+                    USDC
+                  </p>
+                )}
               </Card>
               <Card>
                 <p className="text-sm text-slate-400">Available wallet USDC</p>
@@ -597,7 +607,13 @@ export function MerchantPortal() {
                   {summary.data?.paymentCount ??
                     (summary.error ? "Unavailable" : "Loading…")}
                 </p>
-                {summary.data&&summary.data.outstandingExcessAtomic!=="0"&&<p role="status" className="mt-2 text-sm text-amber-200">{formatUsdc(summary.data.outstandingExcessAtomic)} USDC in extra payments needs review.</p>}
+                {summary.data &&
+                  summary.data.outstandingExcessAtomic !== "0" && (
+                    <p role="status" className="mt-2 text-sm text-amber-200">
+                      {formatUsdc(summary.data.outstandingExcessAtomic)} USDC in
+                      extra payments needs review.
+                    </p>
+                  )}
               </Card>
             </div>
             <div className="grid gap-6 lg:grid-cols-2">
@@ -779,10 +795,21 @@ export function MerchantPortal() {
                           key={payment.id}
                           className="border-t border-white/10"
                         >
-                          <td className="py-4 pr-4">{payment.title}{payment.kind==="duplicate"&&<span className="mt-1 block text-xs text-amber-200">Duplicate transfer</span>}</td>
+                          <td className="py-4 pr-4">
+                            {payment.title}
+                            {payment.kind === "duplicate" && (
+                              <span className="mt-1 block text-xs text-amber-200">
+                                Duplicate transfer
+                              </span>
+                            )}
+                          </td>
                           <td className="pr-4">
                             {formatUsdc(payment.receivedAtomic)}
-                            {payment.refundedAtomic!=="0"&&<span className="mt-1 block text-xs text-slate-400">{formatUsdc(payment.refundedAtomic)} refunded</span>}
+                            {payment.refundedAtomic !== "0" && (
+                              <span className="mt-1 block text-xs text-slate-400">
+                                {formatUsdc(payment.refundedAtomic)} refunded
+                              </span>
+                            )}
                           </td>
                           <td className="pr-4">
                             {new Date(payment.confirmedAt).toLocaleString()}
@@ -800,7 +827,17 @@ export function MerchantPortal() {
                               View transaction
                             </a>
                           </td>
-                          <td><Button variant="ghost" disabled={payment.refundableAtomic==="0"} onClick={()=>setRefundReceipt(payment)}>{payment.refundableAtomic==="0"?"Fully refunded":"Refund"}</Button></td>
+                          <td>
+                            <Button
+                              variant="ghost"
+                              disabled={payment.refundableAtomic === "0"}
+                              onClick={() => setRefundReceipt(payment)}
+                            >
+                              {payment.refundableAtomic === "0"
+                                ? "Fully refunded"
+                                : "Refund"}
+                            </Button>
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -838,7 +875,12 @@ export function MerchantPortal() {
                 </Button>
               </div>
             </Card>
-            <RefundOperations key={address} wallet={address!} selected={refundReceipt} onClose={()=>setRefundReceipt(null)} />
+            <RefundOperations
+              key={address}
+              wallet={address!}
+              selected={refundReceipt}
+              onClose={() => setRefundReceipt(null)}
+            />
           </>
         )}
       </div>

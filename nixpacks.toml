@@ -3,7 +3,7 @@ nixPkgs = ["nodejs_22"]
 
 [phases.install]
 cmds = [
-  "npm ci --include=dev --workspace @sentinelpay/shared --workspace @sentinelpay/api --workspace @sentinelpay/bigint-codec --include-workspace-root=true"
+  "npx --yes npm@11.21.2 ci --include=dev --workspace @sentinelpay/shared --workspace @sentinelpay/api --workspace @sentinelpay/bigint-codec --include-workspace-root=true"
 ]
 
 [phases.build]
